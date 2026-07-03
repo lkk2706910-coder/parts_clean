@@ -1,0 +1,1374 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>TF2-T_EQ1 AMAT Parts Clean management System</title>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <style>
+    :root{
+      --bg-page:#f3f6fc;
+      --bg-card:#ffffff;
+      --text:#1f2a44;
+      --text-soft:#3b4a6b;
+      --muted:#6c7a99;
+      --border-soft:#e2e8f3;
+      --border-strong:#cdd7ec;
+      --shadow:0 14px 36px rgba(70,110,200,.12),0 2px 6px rgba(70,110,200,.05);
+      --accent:#5b8def;
+      --accent-2:#8b5cf6;
+      --accent-soft:#eaf0ff;
+      --accent-dark:#3b66cf;
+      --success:#10b981;
+      --success-soft:#d6f5e6;
+      --danger:#ef5b6e;
+      --danger-soft:#fde4e8;
+      --warning:#f59e0b;
+      --grad-primary:linear-gradient(135deg,#5b8def 0%,#8b5cf6 100%);
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{overflow-x:hidden}
+    body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;background:radial-gradient(1100px 600px at 10% 0%,#dbe5ff 0%,transparent 60%),radial-gradient(900px 600px at 90% 5%,#f1e0ff 0%,transparent 55%),radial-gradient(800px 500px at 50% 110%,#d6f1ff 0%,transparent 60%),var(--bg-page);color:var(--text);min-height:100vh}
+    .wrap{max-width:1760px;margin:22px auto 40px;padding:0 14px;min-width:0}
+    .title{text-align:center;font-weight:900;letter-spacing:.3px;margin:10px 0 16px;font-size:26px;background:var(--grad-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;color:transparent}
+    .card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;overflow:hidden;min-width:0;backdrop-filter:saturate(110%)}
+    .tabs{display:flex;gap:8px;flex-wrap:wrap;padding:6px;background:#f6f8fd;border:1px solid var(--border-soft);border-radius:999px;justify-content:center}
+    .tab{border:1px solid transparent;background:transparent;color:var(--text-soft);padding:8px 14px;border-radius:999px;cursor:pointer;font-weight:700;font-size:13px;transition:all .18s ease;user-select:none}
+    .tab:hover{background:var(--accent-soft);color:var(--accent-dark)}
+    .tab[aria-selected="true"]{background:var(--grad-primary);color:#fff;border-color:transparent;box-shadow:0 8px 18px rgba(94,124,240,.28)}
+    .panel{margin-top:12px;min-width:0}
+    .panel[hidden]{display:none}
+    .stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+    .section{background:#fafbfd;border:1px solid var(--border-soft);border-radius:var(--radius);padding:10px}
+    .section.layout{display:flex;gap:10px;position:relative;align-items:flex-start;min-width:0}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+    .file-actions{display:inline-flex;gap:8px;flex-wrap:wrap}
+    .templates-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px;padding:10px 12px;background:linear-gradient(135deg,#eef3ff 0%,#f5ecff 100%);border:1px dashed var(--border-strong);border-radius:12px}
+    .templates-bar .label{font-size:13px;color:var(--accent-dark);font-weight:800;letter-spacing:.04em}
+    .templates-bar .btn{padding:6px 12px;font-size:12px;border-radius:999px}
+    .mode-toggle{display:inline-flex;flex-direction:row;align-items:center;gap:6px;padding:6px 10px;background:#fff;border-radius:999px;border:1px solid var(--border-soft);box-shadow:0 6px 16px rgba(70,110,200,.12);align-self:flex-start;z-index:5}
+    .mode-toggle::before{content:"Mode";font-size:13px;font-weight:800;color:var(--text-soft);letter-spacing:.06em;padding:0 6px 0 2px}
+    .mode-btn{border-radius:999px;border:1px solid var(--border-soft);background:#fff;color:var(--text-soft);padding:6px 14px;cursor:pointer;font-size:13px;font-weight:800;display:inline-flex;align-items:center;gap:8px;transition:all .18s ease}
+    .mode-btn span.icon{width:12px;height:12px;border-radius:999px;border:1px solid #c9d4ee;background:radial-gradient(circle at 30% 20%,#fff,#dbe6ff 60%,#9fb6f2 100%)}
+    .mode-btn.active{background:var(--grad-primary);color:#fff;border-color:transparent;box-shadow:0 6px 18px rgba(94,124,240,.35);transform:translateY(-1px)}
+    .mode-btn.active span.icon{border-color:rgba(255,255,255,.7);background:radial-gradient(circle at 30% 20%,#fff,#dbe6ff 60%,#fff 100%)}
+    .mode-btn:hover:not(.active){border-color:var(--accent);color:var(--accent-dark);background:var(--accent-soft)}
+    .mode-content{display:flex;flex:1 1 0;gap:10px;min-width:0}
+    .form-pane,.list-pane{flex:1 1 0;min-width:0}
+    .section h3{margin:0 0 10px;text-align:center;font-size:16px;letter-spacing:.2px;color:var(--text-soft);font-weight:800}
+    form.form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 10px;align-items:end}
+    .actions{display:flex;gap:10px;justify-content:flex-end;align-items:center}
+    .actions .btn{padding:8px 14px;font-size:13px;border-radius:8px}
+    label{display:block;font-size:12px;color:var(--muted);margin:0 0 6px;font-weight:700;letter-spacing:.02em}
+    input,select,textarea{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border-soft);background:#fff;color:var(--text);outline:none;font-size:13px;transition:border-color .15s,box-shadow .15s,background .15s}
+    input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94,124,240,.18);background:#fff}
+    textarea{min-height:32px;resize:vertical}
+    .full{grid-column:1 / -1}
+    .group{grid-column:1 / -1;border:1px dashed var(--border-strong);background:#f7f9fe;border-radius:10px;padding:10px 12px}
+    .group > .group-title{font-size:12px;color:var(--accent-dark);font-weight:800;margin-bottom:8px;letter-spacing:.4px}
+    .group-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px 8px}
+    @media (max-width:1280px){.group-grid{grid-template-columns:repeat(6,minmax(0,1fr))}}
+    @media (max-width:980px){.group-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+    .btn{border:1px solid var(--border-soft);background:#fff;color:var(--text-soft);padding:9px 14px;border-radius:10px;cursor:pointer;font-weight:800;width:auto;transition:all .15s ease}
+    .btn:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-dark)}
+    .btn.primary{background:var(--grad-primary);border-color:transparent;color:#fff;box-shadow:0 6px 16px rgba(94,124,240,.28)}
+    .btn.primary:hover{background:linear-gradient(135deg,#4d7fe5,#7d4dee);box-shadow:0 8px 22px rgba(94,124,240,.4)}
+    .btn.danger{background:linear-gradient(135deg,#f87b8c,var(--danger));border-color:transparent;color:#fff;box-shadow:0 4px 12px rgba(239,91,110,.25)}
+    .btn.danger:hover{background:linear-gradient(135deg,#f56476,#e0455a);box-shadow:0 6px 16px rgba(239,91,110,.35)}
+    .toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;min-width:0;width:100%}
+    .toolbar > *{min-width:0}
+    .toolbar h3{margin:0;text-align:left;flex:0 1 auto;white-space:normal;word-break:break-word;overflow-wrap:anywhere;color:var(--text-soft);font-weight:800}
+    input.search{max-width:360px;flex:1 1 180px;width:auto;min-width:0}
+    table{width:100%;border-collapse:collapse;border-radius:12px}
+    thead th{position:sticky;top:0;background:#eef2fa;backdrop-filter:blur(6px);color:var(--text-soft);font-size:11px;text-align:left;padding:9px 6px;border-bottom:2px solid var(--border-strong);white-space:normal;word-break:keep-all;line-height:1.25;z-index:1;vertical-align:bottom;font-weight:800;letter-spacing:.02em}
+    thead th.sortable{cursor:pointer;user-select:none;position:relative;padding-right:14px}
+    thead th.sortable:hover{background:#e3eafb;color:var(--accent-dark)}
+    thead th.sortable::after{content:"▼";font-size:9px;color:var(--accent);position:absolute;right:4px;top:50%;transform:translateY(-50%) rotate(180deg);opacity:.7}
+    thead th.sortable[data-sort-dir="desc"]::after{transform:translateY(-50%) rotate(0)}
+    thead th.grouphead{text-align:center;background:#e6ecf8;border-bottom:1px solid var(--border-strong)}
+    tbody td{padding:8px 6px;border-bottom:1px solid #eef1f8;color:var(--text);font-size:12.5px;vertical-align:top;white-space:nowrap}
+    tbody td.note{white-space:pre-wrap;min-width:120px;max-width:240px}
+    thead th.sticky,tbody td.sticky{position:sticky;left:0;z-index:2;background:#eef2fa}
+    thead th.sticky{z-index:3}
+    tbody td.sticky{background:#fafbfd}
+    tbody tr:hover td.sticky{background:#eef3ff}
+    tbody tr:hover{background:#f5f8fe}
+    .tableWrap{overflow-x:auto;overflow-y:auto;max-height:540px;border-radius:12px;width:100%;max-width:100%;border:1px solid var(--border-soft);background:#fff;-webkit-overflow-scrolling:touch;contain:content;scrollbar-gutter:stable}
+    .tableWrap::-webkit-scrollbar{height:12px;width:12px}
+    .tableWrap::-webkit-scrollbar-track{background:#f3f5fb;border-radius:8px}
+    .tableWrap::-webkit-scrollbar-thumb{background:rgba(94,124,240,.45);border-radius:8px;border:2px solid #fff}
+    .tableWrap::-webkit-scrollbar-thumb:hover{background:rgba(94,124,240,.75)}
+    .tableWrap{scrollbar-color:rgba(94,124,240,.55) #f3f5fb;scrollbar-width:thin}
+    .tableWrap table{width:max-content;min-width:100%}
+    .rowBtns{display:flex;gap:6px}
+    .small{font-size:11px;padding:5px 9px;border-radius:8px;font-weight:800}
+    .stat{font-variant-numeric:tabular-nums}
+    @media (max-width:900px){
+      .mode-toggle{flex-wrap:wrap;width:auto}
+      .mode-btn{flex:1 1 auto}
+      form.form{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .mode-content{flex-direction:column}
+    }
+    select{background:#fff;color:var(--text);border-color:var(--border-soft)}
+    select option,select optgroup{background-color:#fff;color:var(--text)}
+    select option:checked{background:var(--accent-soft);color:var(--accent-dark)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="title">TF2-T_EQ1 AMAT Parts Clean management System</div>
+    <div class="card">
+      <div class="tabs" role="tablist" aria-label="機群分頁">
+        <button class="tab" role="tab" aria-selected="true"  aria-controls="panel-nisacvd-sin"  id="tab-nisacvd-sin"  data-tab="nisacvd-sin">NISACVD_SIN</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-4dc"  id="tab-nisacvd-4dc"  data-tab="nisacvd-4dc">NISACVD_4DC</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-usg"  id="tab-nisacvd-usg"  data-tab="nisacvd-usg">NISACVD_USG</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-harp"   id="tab-sacvd-harp"   data-tab="sacvd-harp">SACVD_HARP</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-sa"     id="tab-sacvd-sa"     data-tab="sacvd-sa">SACVD_SA</button>
+        <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-smt"    id="tab-sacvd-smt"    data-tab="sacvd-smt">SACVD_SMT</button>
+      </div>
+
+      <input type="file" id="import-file-input" accept=".xlsx,.xls" hidden />
+
+      <template id="partsPageTemplate">
+        <div class="stack">
+          <div class="topbar">
+            <div class="mode-toggle">
+              <button type="button" class="mode-btn active" data-mode="submit">填寫</button>
+              <button type="button" class="mode-btn" data-mode="list">清單</button>
+            </div>
+            <div class="file-actions">
+              <button type="button" class="btn small" data-action="trend-chart">Trend Chart</button>
+              <button type="button" class="btn small" data-action="download-template">下載範例 Excel</button>
+              <button type="button" class="btn small" data-action="import-excel">匯入 Excel</button>
+              <button type="button" class="btn small" data-action="export-excel">匯出 Excel</button>
+              <button type="button" class="btn small danger" data-action="dedup">去除重複</button>
+            </div>
+          </div>
+          <div class="section layout">
+            <div class="mode-content">
+              <div class="form-pane">
+                <h3 class="hdr"></h3>
+                <form class="form"></form>
+              </div>
+              <div class="list-pane">
+                <div class="toolbar">
+                  <h3 class="listHdr"></h3>
+                  <input class="search" type="search" placeholder="搜尋…" />
+                </div>
+                <div class="tableWrap">
+                  <table>
+                    <thead></thead>
+                    <tbody></tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <div class="panel" id="panel-nisacvd-sin" role="tabpanel" aria-labelledby="tab-nisacvd-sin">
+        <div style="margin-top:12px;">
+          <div class="tabs" role="tablist" aria-label="NISACVD_SIN Parts">
+            <button class="tab" role="tab" aria-selected="true"  aria-controls="panel-nisacvd-sin-faceplate"  id="tab-nisacvd-sin-faceplate">FACE PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-sin-blockplate" id="tab-nisacvd-sin-blockplate">BLOCK PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-sin-processkits" id="tab-nisacvd-sin-processkits">PROCESS KITS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-sin-rps"        id="tab-nisacvd-sin-rps">RPS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-sin-heater"     id="tab-nisacvd-sin-heater">HEATER</button>
+          </div>
+          <div class="panel" id="panel-nisacvd-sin-faceplate"></div>
+          <div class="panel" id="panel-nisacvd-sin-blockplate" hidden></div>
+          <div class="panel" id="panel-nisacvd-sin-processkits" hidden></div>
+          <div class="panel" id="panel-nisacvd-sin-rps" hidden></div>
+          <div class="panel" id="panel-nisacvd-sin-heater" hidden></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-nisacvd-4dc" role="tabpanel" aria-labelledby="tab-nisacvd-4dc" hidden>
+        <div style="margin-top:12px;">
+          <div class="tabs" role="tablist" aria-label="NISACVD_4DC Parts">
+            <button class="tab" role="tab" aria-selected="true"  aria-controls="panel-nisacvd-4dc-faceplate"  id="tab-nisacvd-4dc-faceplate">FACE PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-4dc-blockplate" id="tab-nisacvd-4dc-blockplate">BLOCK PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-4dc-processkits" id="tab-nisacvd-4dc-processkits">PROCESS KITS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-4dc-rps"        id="tab-nisacvd-4dc-rps">RPS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-4dc-heater"     id="tab-nisacvd-4dc-heater">HEATER</button>
+          </div>
+          <div class="panel" id="panel-nisacvd-4dc-faceplate"></div>
+          <div class="panel" id="panel-nisacvd-4dc-blockplate" hidden></div>
+          <div class="panel" id="panel-nisacvd-4dc-processkits" hidden></div>
+          <div class="panel" id="panel-nisacvd-4dc-rps" hidden></div>
+          <div class="panel" id="panel-nisacvd-4dc-heater" hidden></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-nisacvd-usg" role="tabpanel" aria-labelledby="tab-nisacvd-usg" hidden>
+        <div style="margin-top:12px;">
+          <div class="tabs" role="tablist" aria-label="NISACVD_USG Parts">
+            <button class="tab" role="tab" aria-selected="true"  aria-controls="panel-nisacvd-usg-faceplate"  id="tab-nisacvd-usg-faceplate">FACE PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-usg-blockplate" id="tab-nisacvd-usg-blockplate">BLOCK PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-usg-processkits" id="tab-nisacvd-usg-processkits">PROCESS KITS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-usg-rps"        id="tab-nisacvd-usg-rps">RPS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-nisacvd-usg-heater"     id="tab-nisacvd-usg-heater">HEATER</button>
+          </div>
+          <div class="panel" id="panel-nisacvd-usg-faceplate"></div>
+          <div class="panel" id="panel-nisacvd-usg-blockplate" hidden></div>
+          <div class="panel" id="panel-nisacvd-usg-processkits" hidden></div>
+          <div class="panel" id="panel-nisacvd-usg-rps" hidden></div>
+          <div class="panel" id="panel-nisacvd-usg-heater" hidden></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-sacvd-harp" role="tabpanel" aria-labelledby="tab-sacvd-harp" hidden>
+        <div style="margin-top:12px;">
+          <div class="tabs" role="tablist" aria-label="SACVD_HARP Parts">
+            <button class="tab" role="tab" aria-selected="true"  aria-controls="panel-sacvd-harp-faceplate"  id="tab-sacvd-harp-faceplate">FACE PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-harp-blockplate" id="tab-sacvd-harp-blockplate">BLOCK PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-harp-processkits" id="tab-sacvd-harp-processkits">PROCESS KITS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-harp-rps"        id="tab-sacvd-harp-rps">RPS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-harp-heater"     id="tab-sacvd-harp-heater">HEATER</button>
+          </div>
+          <div class="panel" id="panel-sacvd-harp-faceplate"></div>
+          <div class="panel" id="panel-sacvd-harp-blockplate" hidden></div>
+          <div class="panel" id="panel-sacvd-harp-processkits" hidden></div>
+          <div class="panel" id="panel-sacvd-harp-rps" hidden></div>
+          <div class="panel" id="panel-sacvd-harp-heater" hidden></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-sacvd-sa" role="tabpanel" aria-labelledby="tab-sacvd-sa" hidden>
+        <div style="margin-top:12px;">
+          <div class="tabs" role="tablist" aria-label="SACVD_SA Parts">
+            <button class="tab" role="tab" aria-selected="true"  aria-controls="panel-sacvd-sa-faceplate"  id="tab-sacvd-sa-faceplate">FACE PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-sa-blockplate" id="tab-sacvd-sa-blockplate">BLOCK PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-sa-processkits" id="tab-sacvd-sa-processkits">PROCESS KITS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-sa-rps"        id="tab-sacvd-sa-rps">RPS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-sa-heater"     id="tab-sacvd-sa-heater">HEATER</button>
+          </div>
+          <div class="panel" id="panel-sacvd-sa-faceplate"></div>
+          <div class="panel" id="panel-sacvd-sa-blockplate" hidden></div>
+          <div class="panel" id="panel-sacvd-sa-processkits" hidden></div>
+          <div class="panel" id="panel-sacvd-sa-rps" hidden></div>
+          <div class="panel" id="panel-sacvd-sa-heater" hidden></div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-sacvd-smt" role="tabpanel" aria-labelledby="tab-sacvd-smt" hidden>
+        <div style="margin-top:12px;">
+          <div class="tabs" role="tablist" aria-label="SACVD_SMT Parts">
+            <button class="tab" role="tab" aria-selected="true"  aria-controls="panel-sacvd-smt-faceplate"  id="tab-sacvd-smt-faceplate">FACE PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-smt-blockplate" id="tab-sacvd-smt-blockplate">BLOCK PLATE</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-smt-processkits" id="tab-sacvd-smt-processkits">PROCESS KITS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-smt-rps"        id="tab-sacvd-smt-rps">RPS</button>
+            <button class="tab" role="tab" aria-selected="false" aria-controls="panel-sacvd-smt-heater"     id="tab-sacvd-smt-heater">HEATER</button>
+          </div>
+          <div class="panel" id="panel-sacvd-smt-faceplate"></div>
+          <div class="panel" id="panel-sacvd-smt-blockplate" hidden></div>
+          <div class="panel" id="panel-sacvd-smt-processkits" hidden></div>
+          <div class="panel" id="panel-sacvd-smt-rps" hidden></div>
+          <div class="panel" id="panel-sacvd-smt-heater" hidden></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    /* ============ 機群 / Parts 列表 ============ */
+    const parts = [
+      {id:'nisacvd-sin-faceplate',   label:'NISACVD_SIN - FACE PLATE'},
+      {id:'nisacvd-sin-blockplate',  label:'NISACVD_SIN - BLOCK PLATE'},
+      {id:'nisacvd-sin-processkits', label:'NISACVD_SIN - PROCESS KITS'},
+      {id:'nisacvd-sin-rps',         label:'NISACVD_SIN - RPS'},
+      {id:'nisacvd-sin-heater',      label:'NISACVD_SIN - HEATER'},
+      {id:'nisacvd-4dc-faceplate',   label:'NISACVD_4DC - FACE PLATE'},
+      {id:'nisacvd-4dc-blockplate',  label:'NISACVD_4DC - BLOCK PLATE'},
+      {id:'nisacvd-4dc-processkits', label:'NISACVD_4DC - PROCESS KITS'},
+      {id:'nisacvd-4dc-rps',         label:'NISACVD_4DC - RPS'},
+      {id:'nisacvd-4dc-heater',      label:'NISACVD_4DC - HEATER'},
+      {id:'nisacvd-usg-faceplate',   label:'NISACVD_USG - FACE PLATE'},
+      {id:'nisacvd-usg-blockplate',  label:'NISACVD_USG - BLOCK PLATE'},
+      {id:'nisacvd-usg-processkits', label:'NISACVD_USG - PROCESS KITS'},
+      {id:'nisacvd-usg-rps',         label:'NISACVD_USG - RPS'},
+      {id:'nisacvd-usg-heater',      label:'NISACVD_USG - HEATER'},
+      {id:'sacvd-harp-faceplate',    label:'SACVD_HARP - FACE PLATE'},
+      {id:'sacvd-harp-blockplate',   label:'SACVD_HARP - BLOCK PLATE'},
+      {id:'sacvd-harp-processkits',  label:'SACVD_HARP - PROCESS KITS'},
+      {id:'sacvd-harp-rps',          label:'SACVD_HARP - RPS'},
+      {id:'sacvd-harp-heater',       label:'SACVD_HARP - HEATER'},
+      {id:'sacvd-sa-faceplate',      label:'SACVD_SA - FACE PLATE'},
+      {id:'sacvd-sa-blockplate',     label:'SACVD_SA - BLOCK PLATE'},
+      {id:'sacvd-sa-processkits',    label:'SACVD_SA - PROCESS KITS'},
+      {id:'sacvd-sa-rps',            label:'SACVD_SA - RPS'},
+      {id:'sacvd-sa-heater',         label:'SACVD_SA - HEATER'},
+      {id:'sacvd-smt-faceplate',     label:'SACVD_SMT - FACE PLATE'},
+      {id:'sacvd-smt-blockplate',    label:'SACVD_SMT - BLOCK PLATE'},
+      {id:'sacvd-smt-processkits',   label:'SACVD_SMT - PROCESS KITS'},
+      {id:'sacvd-smt-rps',           label:'SACVD_SMT - RPS'},
+      {id:'sacvd-smt-heater',        label:'SACVD_SMT - HEATER'},
+    ];
+
+    /* ============ Tool / Chamber / Side 選項 ============ */
+    const TOOL_OPTIONS = {
+      'nisacvd-sin': ['NISACVD-B01','NISACVD-B06','NISACVD-B07','NISACVD-B08'],
+      'nisacvd-usg': ['NISACVD-B03','NISACVD-B12','NISACVD-B13','NISACVD-B14'],
+      'nisacvd-4dc': ['NISACVD-B02','NISACVD-B04','NISACVD-B05','NISACVD-B09','NISACVD-B10','NISACVD-B11'],
+      'sacvd-harp':  ['SACVD-B01','SACVD-B04','SACVD-B06','SACVD-B08','SACVD-B09','SACVD-B10'],
+      'sacvd-sa':    ['SACVD-B02','SACVD-B11','SACVD-B12','SACVD-B81'],
+      'sacvd-smt':   ['SACVD-B03','SACVD-B05','SACVD-B07'],
+    };
+    const TOOL_TO_GROUP = (() => {
+      const m = {};
+      Object.entries(TOOL_OPTIONS).forEach(([g, ts]) => ts.forEach(t => { m[t] = g; }));
+      return m;
+    })();
+    const CHAMBER_DEFAULT = ['A','B','C'];
+    const CHAMBER_SACVD_B07 = ['A','B'];
+    const SIDE_OPTIONS = ['S1','S2'];
+    const PART_SUFFIXES = ['faceplate','blockplate','processkits','rps','heater'];
+
+    function getGroupId(partsId){
+      for(const suf of PART_SUFFIXES){
+        const tail = '-' + suf;
+        if(partsId.endsWith(tail)) return partsId.slice(0, -tail.length);
+      }
+      return '';
+    }
+    function getPartType(partsId){
+      for(const suf of PART_SUFFIXES){
+        if(partsId.endsWith('-' + suf)) return suf;
+      }
+      return '';
+    }
+
+    /* ============ Schema：依 partsId 決定欄位 ============ */
+    const FACEPLATE_ROUGH = {
+      'nisacvd-sin-faceplate':8,
+      'nisacvd-4dc-faceplate':8,
+      'nisacvd-usg-faceplate':13,
+      'sacvd-harp-faceplate':8,
+      'sacvd-sa-faceplate':8,
+      'sacvd-smt-faceplate':8,
+    };
+    const PKIT_OPTIONS = {
+      'nisacvd-sin-processkits': ['Top liner','Middle liner','Bottom liner','Spacer'],
+      'nisacvd-4dc-processkits': ['Top liner','Middle liner','Bottom liner','Spacer'],
+      'nisacvd-usg-processkits': ['Top liner'],
+      'sacvd-harp-processkits':  ['Top liner'],
+      'sacvd-sa-processkits':    ['Top liner'],
+      'sacvd-smt-processkits':   ['Top liner','Middle liner','Bottom liner','Spacer'],
+    };
+    function getRoughCount(partsId, pkitName){
+      const type = getPartType(partsId);
+      if(type === 'rps') return 0;
+      if(type === 'faceplate') return FACEPLATE_ROUGH[partsId] || 8;
+      if(type === 'blockplate') return 8;
+      if(type === 'heater') return 9;
+      if(type === 'processkits'){
+        if(pkitName === 'Middle liner') return 4;
+        if(pkitName) return 8; // Top / Bottom / Spacer
+        return 0; // 還沒選品名
+      }
+      return 0;
+    }
+    function getMaxRoughCount(partsId){
+      const type = getPartType(partsId);
+      if(type === 'rps') return 0;
+      if(type === 'faceplate') return FACEPLATE_ROUGH[partsId] || 8;
+      if(type === 'blockplate') return 8;
+      if(type === 'heater') return 9;
+      if(type === 'processkits') return 8;
+      return 0;
+    }
+    function getParticleCount(partsId){
+      const type = getPartType(partsId);
+      if(type === 'faceplate' || type === 'blockplate' || type === 'processkits') return 4;
+      return 0;
+    }
+    function hasCleanFields(partsId){
+      const type = getPartType(partsId);
+      return type === 'faceplate' || type === 'blockplate' || type === 'processkits';
+    }
+
+    /* ============ 欄位定義（CSV / 表頭共用） ============ */
+    function getColumns(partsId){
+      const type = getPartType(partsId);
+      if(type === 'rps'){
+        return [
+          {key:'tool',           label:'Tool'},
+          {key:'chamber',        label:'Chamber'},
+          {key:'side',           label:'Side'},
+          {key:'date',           label:'Date'},
+          {key:'category',       label:'Category'},
+          {key:'sn',             label:'SN'},
+          {key:'hours',          label:'時數'},
+          {key:'purgerCount',    label:'Purger次數<50ea'},
+          {key:'cleanBeforeIn',  label:'Clean前(in端)PA'},
+          {key:'cleanBeforeOut', label:'Clean前(out端)PA'},
+          {key:'cleanAfterIn1',  label:'Clean後(in) 1st'},
+          {key:'cleanAfterIn2',  label:'Clean後(in) 2nd'},
+          {key:'cleanAfterIn3',  label:'Clean後(in) 3rd'},
+          {key:'cleanAfterOut1', label:'Clean後(out) 1st'},
+          {key:'cleanAfterOut2', label:'Clean後(out) 2nd'},
+          {key:'cleanAfterOut3', label:'Clean後(out) 3rd'},
+          {key:'pa5',            label:'PA5顆數每次'},
+          {key:'pmStaff',        label:'PM人員'},
+          {key:'vendor',         label:'維修商'},
+          {key:'note',           label:'備註'},
+        ];
+      }
+      const cols = [
+        {key:'tool',     label:'Tool'},
+        {key:'chamber',  label:'Chamber'},
+        {key:'side',     label:'Side'},
+        {key:'pmDate',   label:'PM日期'},
+      ];
+      if(type === 'processkits') cols.push({key:'pkitName', label:'品名'});
+      cols.push({key:'sn',        label:'Parts S/N'});
+      cols.push({key:'onDate',    label:'上機日期'});
+      cols.push({key:'offDate',   label:'下機日期'});
+      cols.push({key:'offReason', label:'下機原因'});
+      if(hasCleanFields(partsId)){
+        cols.push({key:'cleanType',  label:'清洗方式'});
+        cols.push({key:'selfWash',   label:'自洗次數'});
+        cols.push({key:'vendorWash', label:'廠洗次數'});
+      }
+      const maxR = getMaxRoughCount(partsId);
+      for(let i=1;i<=maxR;i++) cols.push({key:'rough'+i, label:'R'+i});
+      const particleCount = getParticleCount(partsId);
+      for(let i=1;i<=particleCount;i++) cols.push({key:'particle'+i, label:'P'+i});
+      cols.push({key:'note', label:'備註'});
+      return cols;
+    }
+
+    /* ============ CSV 編碼 / 解析 ============ */
+    function csvEscape(s){
+      s = String(s ?? '');
+      if(/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }
+    function rowsToCsv(rows, cols){
+      const head = cols.map(c => csvEscape(c.label)).join(',');
+      const body = rows.map(r => cols.map(c => csvEscape(r[c.key])).join(','));
+      // ﻿ 為 UTF-8 BOM，讓 Excel 直接以 UTF-8 開啟
+      return '﻿' + [head, ...body].join('\r\n');
+    }
+    function parseCsv(text){
+      if(text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+      const rows = [];
+      let row = [], field = '', inQ = false;
+      for(let i=0;i<text.length;i++){
+        const ch = text[i];
+        if(inQ){
+          if(ch === '"'){
+            if(text[i+1] === '"'){ field += '"'; i++; continue; }
+            inQ = false; continue;
+          }
+          field += ch; continue;
+        }
+        if(ch === '"'){ inQ = true; continue; }
+        if(ch === ','){ row.push(field); field = ''; continue; }
+        if(ch === '\r'){ continue; }
+        if(ch === '\n'){ row.push(field); rows.push(row); row = []; field = ''; continue; }
+        field += ch;
+      }
+      if(field.length || row.length){ row.push(field); rows.push(row); }
+      return rows;
+    }
+    function triggerDownload(filename, content, mime){
+      const blob = new Blob([content], {type: mime || 'text/csv;charset=utf-8'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+    }
+    /* 取得「以 part type 最大欄位」為基準的欄位（給範例 Excel 用） */
+    function getColumnsForType(partType){
+      switch(partType){
+        case 'faceplate':   return getColumns('nisacvd-usg-faceplate');   // 13 點為最大
+        case 'blockplate':  return getColumns('nisacvd-sin-blockplate');  // 8 點
+        case 'processkits': return getColumns('nisacvd-sin-processkits'); // 8 點 + 品名
+        case 'rps':         return getColumns('nisacvd-sin-rps');
+        case 'heater':      return getColumns('nisacvd-sin-heater');
+        default: return [];
+      }
+    }
+    /* PART 類型與工作表名稱對照 */
+    const SHEET_TYPES = [
+      {sheet:'FACE PLATE',   type:'faceplate'},
+      {sheet:'BLOCK PLATE',  type:'blockplate'},
+      {sheet:'PROCESS KITS', type:'processkits'},
+      {sheet:'RPS',          type:'rps'},
+      {sheet:'HEATER',       type:'heater'},
+    ];
+    const SHEET_TO_TYPE = (() => {
+      const m = {};
+      SHEET_TYPES.forEach(({sheet, type}) => { m[sheet.toUpperCase()] = type; });
+      return m;
+    })();
+    /* 產生一份含 5 工作表的範例 .xlsx */
+    function downloadAllTemplate(){
+      if(typeof XLSX === 'undefined'){ alert('Excel 模組尚未載入，請檢查網路'); return; }
+      const wb = XLSX.utils.book_new();
+      SHEET_TYPES.forEach(({sheet, type}) => {
+        const cols = getColumnsForType(type);
+        const ws = XLSX.utils.aoa_to_sheet([cols.map(c => c.label)]);
+        XLSX.utils.book_append_sheet(wb, ws, sheet);
+      });
+      XLSX.writeFile(wb, 'PartsClean_template.xlsx');
+    }
+    /* 匯出所有清單 → 與範例同格式（5 個工作表），每張表彙整該 type 下所有機型的紀錄 */
+    function downloadAllExport(){
+      if(typeof XLSX === 'undefined'){ alert('Excel 模組尚未載入，請檢查網路'); return; }
+      const wb = XLSX.utils.book_new();
+      let total = 0;
+      SHEET_TYPES.forEach(({sheet, type}) => {
+        const cols = getColumnsForType(type);
+        const aoa = [cols.map(c => c.label)];
+        parts.forEach(p => {
+          if(getPartType(p.id) !== type) return;
+          loadRows(p.id).forEach(row => {
+            aoa.push(cols.map(c => {
+              const v = row[c.key];
+              return (v === undefined || v === null) ? '' : v;
+            }));
+          });
+        });
+        total += aoa.length - 1;
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        XLSX.utils.book_append_sheet(wb, ws, sheet);
+      });
+      const d = new Date();
+      const stamp = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+      XLSX.writeFile(wb, `PartsClean_export_${stamp}.xlsx`);
+      if(total === 0) alert('目前沒有任何資料，匯出檔只包含表頭');
+    }
+    /* Excel cell 正規化：把 Date 物件 / Excel 日期序號統一變成 YYYY/MM/DD */
+    function _ymd(d){
+      return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+    }
+    const DATE_KEYS = new Set(['pmDate','date','onDate','offDate']);
+    function normalizeCell(v, key){
+      if(v == null) return '';
+      if(DATE_KEYS.has(key)){
+        if(v instanceof Date) return isNaN(v) ? '' : _ymd(v);
+        if(typeof v === 'number' && v > 20000 && v < 80000){
+          const d = new Date((v - 25569) * 86400 * 1000);
+          if(!isNaN(d)) return _ymd(d);
+        }
+      }
+      return String(v).trim();
+    }
+    /* 將 grid 依 type 解析、依 Tool 分流（純計算，不 alert、不寫入） */
+    function parseGridForType(partType, grid, sheetLabel){
+      const r = { bucket:{}, skippedNoTool:[], skippedUnknownTool:[], matched:0, headerMismatch:false };
+      if(!grid || grid.length === 0) return r;
+      const cols = getColumnsForType(partType);
+      const headers = (grid[0] || []).map(h => String(h ?? '').trim());
+      const keyByIdx = headers.map(h => (cols.find(c => c.label === h) || {}).key || null);
+      r.matched = keyByIdx.filter(Boolean).length;
+      if(r.matched === 0){ r.headerMismatch = true; return r; }
+      const tag = sheetLabel ? `[${sheetLabel}] ` : '';
+      for(let i=1;i<grid.length;i++){
+        const row = grid[i];
+        if(!row || row.every(v => v == null || String(v).trim() === '')) continue;
+        const obj = {};
+        for(let j=0;j<keyByIdx.length;j++){
+          const k = keyByIdx[j];
+          if(k) obj[k] = normalizeCell(row[j], k);
+        }
+        if(!obj.tool){ r.skippedNoTool.push(`${tag}第${i+1}列`); continue; }
+        const group = TOOL_TO_GROUP[obj.tool];
+        if(!group){ r.skippedUnknownTool.push(`${tag}第${i+1}列(Tool=${obj.tool})`); continue; }
+        const partsId = `${group}-${partType}`;
+        obj.id = (crypto?.randomUUID ? crypto.randomUUID()
+          : `${Date.now()}-${i}-${Math.random().toString(16).slice(2)}`);
+        if(!r.bucket[partsId]) r.bucket[partsId] = [];
+        r.bucket[partsId].push(obj);
+      }
+      return r;
+    }
+    /* 匯入多工作表 Excel：依工作表名稱對應 PART 類型，再依 Tool 分流 */
+    /* 重複比對用的 natural key：依 PART 類型決定關鍵欄位 */
+    function getNaturalKey(row, partType){
+      const n = v => String(v ?? '').trim().toLowerCase();
+      if(partType === 'rps'){
+        return [n(row.tool), n(row.chamber), n(row.side), n(row.date), n(row.sn)].join('|');
+      }
+      if(partType === 'processkits'){
+        return [n(row.tool), n(row.chamber), n(row.side), n(row.pmDate), n(row.pkitName), n(row.sn)].join('|');
+      }
+      return [n(row.tool), n(row.chamber), n(row.side), n(row.pmDate), n(row.sn)].join('|');
+    }
+    function describeRow(row, partType){
+      if(partType === 'rps')         return `Tool=${row.tool} / ${row.chamber} / ${row.side} / Date=${row.date} / SN=${row.sn}`;
+      if(partType === 'processkits') return `Tool=${row.tool} / ${row.chamber} / ${row.side} / ${row.pmDate} / 品名=${row.pkitName} / SN=${row.sn}`;
+      return `Tool=${row.tool} / ${row.chamber} / ${row.side} / ${row.pmDate} / SN=${row.sn}`;
+    }
+
+    /* 清單內去重：掃描單一 partsId 的舊資料，找出 natural key 重複的紀錄，confirm 後移除 */
+    function dedupCurrent(partsId){
+      const partType = getPartType(partsId);
+      const rows = loadRows(partsId);
+      const seen = new Map();
+      const kept = [], removed = [];
+      rows.forEach((r, idx) => {
+        const k = getNaturalKey(r, partType);
+        const isEmptyKey = k.split('|').every(p => !p);
+        if(isEmptyKey){ kept.push(r); return; }
+        if(seen.has(k)){
+          removed.push(r);
+        }else{
+          seen.set(k, idx);
+          kept.push(r);
+        }
+      });
+      if(removed.length === 0){ alert('沒有發現重複資料'); return; }
+      const preview = removed.slice(0, 6).map(r => `  · ${describeRow(r, partType)}`).join('\n');
+      const more = removed.length > 6 ? `\n  · …另外 ${removed.length - 6} 筆` : '';
+      const yes = confirm(
+        `偵測到 ${removed.length} 筆重複資料（依 Tool/Chamber/Side/日期/SN 等比對）：\n` +
+        preview + more +
+        `\n\n[確定] 移除這 ${removed.length} 筆（每組保留先出現的一筆）\n[取消] 取消`
+      );
+      if(!yes) return;
+      saveRows(partsId, kept);
+      render(partsId);
+      alert(`已移除 ${removed.length} 筆重複資料`);
+    }
+
+    async function importWorkbookFile(file){
+      const ext = (file.name.split('.').pop() || '').toLowerCase();
+      if(ext !== 'xlsx' && ext !== 'xls'){
+        alert('請使用 Excel 檔案 (.xlsx / .xls)'); return;
+      }
+      if(typeof XLSX === 'undefined'){
+        alert('Excel 解析模組尚未載入，請檢查網路'); return;
+      }
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array', cellDates:true});
+
+      // 第一階段：解析所有工作表 → 依 partsId 收集進來的新資料
+      const incoming = {};     // partsId → [{row, sheet, key}]
+      const noTool     = [];
+      const unknownTl  = [];
+      const noMatch    = [];
+      const headerBad  = [];
+      for(const sheetName of wb.SheetNames){
+        const type = SHEET_TO_TYPE[(sheetName || '').trim().toUpperCase()];
+        if(!type){ noMatch.push(sheetName); continue; }
+        const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:''});
+        const res = parseGridForType(type, grid, sheetName);
+        if(res.headerMismatch){ headerBad.push(sheetName); continue; }
+        noTool.push(...res.skippedNoTool);
+        unknownTl.push(...res.skippedUnknownTool);
+        Object.entries(res.bucket).forEach(([partsId, rows]) => {
+          if(!incoming[partsId]) incoming[partsId] = [];
+          rows.forEach(row => {
+            incoming[partsId].push({row, sheet:sheetName, key:getNaturalKey(row, type)});
+          });
+        });
+      }
+
+      // 第 1.5 階段：匯入檔自身去重（同 partsId 內若有相同 key，後寫後贏）
+      const inFileDup = []; // [{partsId, sheet, row, partType}]
+      Object.entries(incoming).forEach(([partsId, items]) => {
+        const partType = getPartType(partsId);
+        const idxByKey = new Map();
+        const unique = [];
+        items.forEach(item => {
+          const isEmptyKey = item.key.split('|').every(p => !p);
+          if(isEmptyKey){ unique.push(item); return; }
+          if(idxByKey.has(item.key)){
+            const i = idxByKey.get(item.key);
+            inFileDup.push({partsId, sheet:unique[i].sheet, row:unique[i].row, partType});
+            unique[i] = item; // 後寫後贏
+          }else{
+            idxByKey.set(item.key, unique.length);
+            unique.push(item);
+          }
+        });
+        incoming[partsId] = unique;
+      });
+
+      // 第二階段：比對現有資料，分為「新增」與「重複」
+      const fresh = {};                  // partsId → [row]
+      const duplicates = [];             // {partsId, partType, sheet, newRow, existingId, key, desc}
+      Object.entries(incoming).forEach(([partsId, items]) => {
+        const partType = getPartType(partsId);
+        const existing = loadRows(partsId);
+        const existingByKey = {};
+        existing.forEach(r => { existingByKey[getNaturalKey(r, partType)] = r; });
+        items.forEach(({row, sheet, key}) => {
+          const ex = existingByKey[key];
+          if(ex){
+            duplicates.push({
+              partsId, partType, sheet, newRow:row, existingId:ex.id, key,
+              desc:`[${sheet}] ${partsId} → ${describeRow(row, partType)}`
+            });
+          }else{
+            if(!fresh[partsId]) fresh[partsId] = [];
+            fresh[partsId].push(row);
+          }
+        });
+      });
+
+      // 第三階段：若有重複，詢問處理方式
+      let dupAction = 'skip'; // 'skip' 或 'overwrite'
+      if(duplicates.length > 0){
+        const preview = duplicates.slice(0, 6).map(d => '  · ' + d.desc).join('\n');
+        const more = duplicates.length > 6 ? `\n  · …另外 ${duplicates.length - 6} 筆` : '';
+        const yes = confirm(
+          `比對到 ${duplicates.length} 筆與現有資料重複（依 Tool/Chamber/Side/日期/SN 等欄位比對）：\n` +
+          preview + more +
+          `\n\n[確定] 覆蓋現有紀錄（用匯入資料取代）\n[取消] 略過重複的（只匯入未重複的）`
+        );
+        dupAction = yes ? 'overwrite' : 'skip';
+      }
+
+      // 第四階段：套用寫入
+      const summary = [];
+      let totalNew = 0, totalUpd = 0;
+      const allPartsIds = new Set([...Object.keys(fresh), ...new Set(duplicates.map(d => d.partsId))]);
+      allPartsIds.forEach(partsId => {
+        let existing = loadRows(partsId);
+        const dupHere = duplicates.filter(d => d.partsId === partsId);
+        const newRows = (fresh[partsId] || []).slice();
+        let upd = 0;
+        if(dupAction === 'overwrite' && dupHere.length){
+          const removeIds = new Set(dupHere.map(d => d.existingId));
+          existing = existing.filter(r => !removeIds.has(r.id));
+          dupHere.forEach(d => {
+            d.newRow.id = d.existingId; // 沿用舊 id
+            newRows.push(d.newRow);
+            upd++;
+          });
+        }
+        const add = newRows.length - upd;
+        if(newRows.length > 0){
+          saveRows(partsId, newRows.concat(existing));
+          render(partsId);
+          summary.push(`  ${partsId}：新增 ${add}${upd?` / 覆蓋 ${upd}`:''} 筆`);
+          totalNew += add;
+          totalUpd += upd;
+        }
+      });
+
+      // 第五階段：alert 彙整
+      const msgs = [];
+      if(totalNew + totalUpd > 0){
+        msgs.push(`匯入完成：新增 ${totalNew} 筆${totalUpd?` / 覆蓋 ${totalUpd} 筆`:''}`);
+        msgs.push(...summary);
+      }else{
+        msgs.push('沒有匯入任何資料');
+      }
+      if(dupAction === 'skip' && duplicates.length){
+        msgs.push(`\n略過 ${duplicates.length} 筆與現有資料重複的`);
+      }
+      if(inFileDup.length){
+        msgs.push(`\n匯入檔內自身重複已自動合併 ${inFileDup.length} 筆（後出現的取代先出現的）：`);
+        msgs.push(...inFileDup.slice(0, 6).map(d => `  · [${d.sheet}] ${d.partsId} → ${describeRow(d.row, d.partType)}`));
+        if(inFileDup.length > 6) msgs.push(`  · …另外 ${inFileDup.length - 6} 筆`);
+      }
+      if(noMatch.length)   msgs.push(`忽略未知工作表：${noMatch.join('、')}`);
+      if(headerBad.length) msgs.push(`忽略表頭對不上的工作表：${headerBad.join('、')}`);
+      if(noTool.length)    msgs.push(`跳過 ${noTool.length} 列（Tool 為空）`);
+      if(unknownTl.length){
+        msgs.push(`跳過 ${unknownTl.length} 列（Tool 不在清單）：`);
+        msgs.push('  ' + unknownTl.slice(0,8).join('、') + (unknownTl.length>8?'…':''));
+      }
+      alert(msgs.join('\n'));
+    }
+
+    /* ============ 共用工具 ============ */
+    const escapeHtml = s => String(s ?? '')
+      .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+      .replaceAll('"','&quot;').replaceAll("'","&#039;");
+
+    function computeStats(values){
+      const nums = (values || []).map(v => parseFloat(v)).filter(n => !isNaN(n));
+      if(nums.length === 0) return { max:'', min:'', avg:'' };
+      const max = Math.max(...nums);
+      const min = Math.min(...nums);
+      const avg = nums.reduce((a,b)=>a+b,0) / nums.length;
+      return {
+        max: String(+max.toFixed(2)),
+        min: String(+min.toFixed(2)),
+        avg: String(+avg.toFixed(2)),
+      };
+    }
+    function todayStr(){
+      const d = new Date();
+      return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    /* ============ 後端 / 快取 ============ */
+    const STORE_PREFIX = 'partsLog::';
+    const storeKey = id => STORE_PREFIX + id;
+    const API_BASE = './PartsCleanApi/parts-clean-handler.ashx';
+    async function apiLoadRows(partsId){
+      const r = await fetch(`${API_BASE}?mode=load&partsId=${encodeURIComponent(partsId)}`, {cache:'no-store'});
+      if(!r.ok) throw new Error('讀取失敗');
+      const d = await r.json();
+      if(!d.success) throw new Error(d.error || '讀取失敗');
+      return Array.isArray(d.rows) ? d.rows : [];
+    }
+    async function apiSaveRows(partsId, rows){
+      const fd = new FormData();
+      fd.append('mode','save'); fd.append('partsId', partsId); fd.append('rows', JSON.stringify(rows));
+      const r = await fetch(API_BASE, {method:'POST', body:fd});
+      if(!r.ok) throw new Error('儲存失敗');
+      const d = await r.json();
+      if(!d.success) throw new Error(d.error || '儲存失敗');
+    }
+    function loadRows(partsId){
+      try{ const raw = sessionStorage.getItem(storeKey(partsId)); const a = raw ? JSON.parse(raw) : []; return Array.isArray(a) ? a : []; }
+      catch{ return []; }
+    }
+    function saveRows(partsId, rows){
+      sessionStorage.setItem(storeKey(partsId), JSON.stringify(rows));
+      apiSaveRows(partsId, rows).catch(e => console.error('同步後端失敗', e));
+    }
+    async function syncFromServer(partsId){
+      try{
+        const rows = await apiLoadRows(partsId);
+        sessionStorage.setItem(storeKey(partsId), JSON.stringify(rows));
+        render(partsId);
+      }catch(e){ console.error('從後端同步資料失敗', e); }
+    }
+
+    /* ============ 表單渲染 ============ */
+    function optionList(opts, sel){
+      return ['<option value="" selected disabled>請選擇</option>']
+        .concat(opts.map(v => `<option value="${escapeHtml(v)}"${sel===v?' selected':''}>${escapeHtml(v)}</option>`))
+        .join('');
+    }
+    function chamberOptions(toolValue){
+      return toolValue === 'SACVD-B07' ? CHAMBER_SACVD_B07 : CHAMBER_DEFAULT;
+    }
+
+    function fieldHtml(label, inputHtml, full){
+      return `<div${full?' class="full"':''}><label>${escapeHtml(label)}</label>${inputHtml}</div>`;
+    }
+    function pointsGroupHtml(title, prefix, count){
+      if(!count) return '';
+      const cells = [];
+      for(let i=1;i<=count;i++){
+        cells.push(`<div><label>${escapeHtml(title)}${i}</label><input name="${prefix}${i}" type="number" step="any" /></div>`);
+      }
+      return `<div class="group"><div class="group-title">${escapeHtml(title)}（${count} 點，自動計算 MAX / MIN / AVG）</div><div class="group-grid">${cells.join('')}</div></div>`;
+    }
+
+    function renderForm(form, partsId){
+      const type = getPartType(partsId);
+      const groupId = getGroupId(partsId);
+      const tools = TOOL_OPTIONS[groupId] || [];
+
+      if(type === 'rps'){
+        form.innerHTML = `
+          ${fieldHtml('Tool', `<select name="tool">${optionList(tools)}</select>`)}
+          ${fieldHtml('Chamber', `<select name="chamber">${optionList(CHAMBER_DEFAULT)}</select>`)}
+          ${fieldHtml('Side', `<select name="side">${optionList(SIDE_OPTIONS)}</select>`)}
+          ${fieldHtml('Date', `<input name="date" type="text" placeholder="YYYY/MM/DD" value="${todayStr()}" />`)}
+          ${fieldHtml('Category', `<select name="category">${optionList(['UD','SD'])}</select>`)}
+          ${fieldHtml('SN', `<input name="sn" type="text" />`)}
+          ${fieldHtml('時數', `<input name="hours" type="number" step="any" />`)}
+          ${fieldHtml('Purger次數<50ea', `<input name="purgerCount" type="number" step="any" />`)}
+          ${fieldHtml('Clean前(in端)PA', `<input name="cleanBeforeIn" type="number" step="any" />`)}
+          ${fieldHtml('Clean前(out端)PA', `<input name="cleanBeforeOut" type="number" step="any" />`)}
+          <div class="group"><div class="group-title">Clean後(in)端</div><div class="group-grid">
+            <div><label>1st</label><input name="cleanAfterIn1" type="number" step="any" /></div>
+            <div><label>2nd</label><input name="cleanAfterIn2" type="number" step="any" /></div>
+            <div><label>3rd</label><input name="cleanAfterIn3" type="number" step="any" /></div>
+          </div></div>
+          <div class="group"><div class="group-title">Clean後(out)端</div><div class="group-grid">
+            <div><label>1st</label><input name="cleanAfterOut1" type="number" step="any" /></div>
+            <div><label>2nd</label><input name="cleanAfterOut2" type="number" step="any" /></div>
+            <div><label>3rd</label><input name="cleanAfterOut3" type="number" step="any" /></div>
+          </div></div>
+          ${fieldHtml('PA5顆數每次', `<input name="pa5" type="number" step="any" />`)}
+          ${fieldHtml('PM人員', `<input name="pmStaff" type="text" />`)}
+          ${fieldHtml('維修商', `<input name="vendor" type="text" />`)}
+          ${fieldHtml('備註', `<textarea name="note" placeholder="可留空"></textarea>`, true)}
+          <div class="full actions">
+            <button class="btn primary" type="submit">Submit</button>
+            <button class="btn" type="reset">Reset</button>
+          </div>`;
+      } else {
+        // standard / blockplate / processkits / heater 共用基底
+        const showPkit = (type === 'processkits');
+        const showClean = hasCleanFields(partsId);
+        const pkitOpts = showPkit ? (PKIT_OPTIONS[partsId] || []) : [];
+        const particleCount = getParticleCount(partsId);
+        // 初始的 rough 點數
+        const initialRough = (type === 'processkits') ? 0 : getRoughCount(partsId, null);
+
+        let html = `
+          ${fieldHtml('Tool', `<select name="tool">${optionList(tools)}</select>`)}
+          ${fieldHtml('Chamber', `<select name="chamber">${optionList(CHAMBER_DEFAULT)}</select>`)}
+          ${fieldHtml('Side', `<select name="side">${optionList(SIDE_OPTIONS)}</select>`)}
+          ${fieldHtml('PM日期', `<input name="pmDate" type="text" placeholder="YYYY/MM/DD" value="${todayStr()}" />`)}
+          ${showPkit ? fieldHtml('品名', `<select name="pkitName">${optionList(pkitOpts)}</select>`) : ''}
+          ${fieldHtml('Parts S/N', `<input name="sn" type="text" />`)}
+          ${fieldHtml('上機日期', `<input name="onDate" type="text" placeholder="YYYY/MM/DD" />`)}
+          ${fieldHtml('下機日期', `<input name="offDate" type="text" placeholder="YYYY/MM/DD" />`)}
+          ${fieldHtml('下機原因', `<input name="offReason" type="text" placeholder="可留空" />`)}
+        `;
+        if(showClean){
+          html += `
+            ${fieldHtml('清洗方式', `<select name="cleanType"><option value="" selected disabled>請選擇</option><option value="self">自行水洗</option><option value="vendor">廠商清洗</option></select>`)}
+            ${fieldHtml('自洗次數', `<input name="selfWash" type="number" min="0" step="1" value="0" />`)}
+            ${fieldHtml('廠洗次數', `<input name="vendorWash" type="number" min="0" step="1" value="0" />`)}
+          `;
+        }
+        html += `
+          <div class="full" data-rough-host>${pointsGroupHtml('Roughness', 'rough', initialRough)}</div>
+          ${particleCount ? `<div class="full">${pointsGroupHtml('Particle','particle',particleCount)}</div>` : ''}
+          ${fieldHtml('備註', `<textarea name="note" placeholder="可留空"></textarea>`, true)}
+          <div class="full actions">
+            <button class="btn primary" type="submit">Submit</button>
+            <button class="btn" type="reset">Reset</button>
+          </div>`;
+        form.innerHTML = html;
+      }
+
+      // Tool 改變 → 重建 Chamber 選項
+      const toolSel = form.querySelector('select[name="tool"]');
+      const chamberSel = form.querySelector('select[name="chamber"]');
+      if(toolSel && chamberSel){
+        toolSel.addEventListener('change', () => {
+          chamberSel.innerHTML = optionList(chamberOptions(toolSel.value));
+        });
+      }
+      // Process kits 品名改變 → 重建 Roughness 點數
+      if(type === 'processkits'){
+        const pkitSel = form.querySelector('select[name="pkitName"]');
+        const roughHost = form.querySelector('[data-rough-host]');
+        if(pkitSel && roughHost){
+          pkitSel.addEventListener('change', () => {
+            const n = getRoughCount(partsId, pkitSel.value);
+            roughHost.innerHTML = pointsGroupHtml('Roughness','rough',n);
+          });
+        }
+      }
+    }
+
+    function fillForm(form, row, partsId){
+      // 還原所有 input/select/textarea 的值
+      Object.entries(row || {}).forEach(([k,v]) => {
+        const el = form.querySelector(`[name="${k}"]`);
+        if(el) el.value = v ?? '';
+      });
+      // Process kits: 依品名重建 Roughness 後再填值
+      if(getPartType(partsId) === 'processkits' && row?.pkitName){
+        const roughHost = form.querySelector('[data-rough-host]');
+        if(roughHost){
+          const n = getRoughCount(partsId, row.pkitName);
+          roughHost.innerHTML = pointsGroupHtml('Roughness','rough',n);
+          for(let i=1;i<=n;i++){
+            const k = 'rough'+i;
+            const el = form.querySelector(`[name="${k}"]`);
+            if(el) el.value = row[k] ?? '';
+          }
+        }
+      }
+      // Chamber 依 tool 重建後再填
+      const toolSel = form.querySelector('select[name="tool"]');
+      const chamberSel = form.querySelector('select[name="chamber"]');
+      if(toolSel && chamberSel && row?.tool){
+        chamberSel.innerHTML = optionList(chamberOptions(row.tool), row.chamber);
+      }
+    }
+
+    /* ============ 清單表頭 / 列 ============ */
+    function makeHeaderHtml(partsId){
+      const type = getPartType(partsId);
+      const roughCount = getRoughCount(partsId, null); // 顯示用：彙總值，不需確切點數
+      const showRough = type !== 'rps';
+      const particleCount = getParticleCount(partsId);
+      const showClean = hasCleanFields(partsId);
+      const showPkit = (type === 'processkits');
+
+      if(type === 'rps'){
+        const h = [
+          ['Tool','tool',1],['Chamber','chamber',2],['Side','side',3],
+          ['Date','date',4],['Category','category',5],['SN','sn',6],
+          ['時數','hours'],['Purger次數<50ea','purgerCount'],
+          ['Clean前<br>(in端)PA','cleanBeforeIn'],['Clean前<br>(out端)PA','cleanBeforeOut'],
+        ];
+        const sticky = h.filter(c=>c[2]);
+        const rest = h.filter(c=>!c[2]);
+        return `<tr>
+          ${sticky.map(c=>`<th class="sortable sticky sticky-${c[2]}" data-key="${c[1]}">${c[0]}</th>`).join('')}
+          ${rest.map(c=>`<th class="sortable" data-key="${c[1]}">${c[0]}</th>`).join('')}
+          <th class="sortable" data-key="cleanAfterIn1">Clean後(in)<br>1st</th>
+          <th class="sortable" data-key="cleanAfterIn2">Clean後(in)<br>2nd</th>
+          <th class="sortable" data-key="cleanAfterIn3">Clean後(in)<br>3rd</th>
+          <th class="sortable" data-key="cleanAfterOut1">Clean後(out)<br>1st</th>
+          <th class="sortable" data-key="cleanAfterOut2">Clean後(out)<br>2nd</th>
+          <th class="sortable" data-key="cleanAfterOut3">Clean後(out)<br>3rd</th>
+          <th class="sortable" data-key="pa5">PA5顆數<br>每次</th>
+          <th class="sortable" data-key="pmStaff">PM人員</th>
+          <th class="sortable" data-key="vendor">維修商</th>
+          <th>備註</th><th>操作</th>
+        </tr>`;
+      }
+
+      const cols = [];
+      cols.push({label:'Tool', key:'tool', sticky:1});
+      cols.push({label:'Chamber', key:'chamber', sticky:2});
+      cols.push({label:'Side', key:'side', sticky:3});
+      cols.push({label:'PM日期', key:'pmDate', sticky:4});
+      if(showPkit) cols.push({label:'品名', key:'pkitName', sticky:5});
+      cols.push({label:'Parts S/N', key:'sn', sticky: showPkit?6:5});
+      cols.push({label:'上機日期', key:'onDate'});
+      cols.push({label:'下機日期', key:'offDate'});
+      cols.push({label:'下機原因', key:'offReason'});
+      if(showClean){
+        cols.push({label:'清洗方式', key:'cleanType'});
+        cols.push({label:'自洗次數', key:'selfWash'});
+        cols.push({label:'廠洗次數', key:'vendorWash'});
+      }
+      if(showRough){
+        const maxR = getMaxRoughCount(partsId);
+        for(let i=1;i<=maxR;i++) cols.push({label:`R${i}`, key:`rough${i}`});
+        cols.push({label:'Rough<br>MAX', key:'roughMax', stat:true});
+        cols.push({label:'Rough<br>MIN', key:'roughMin', stat:true});
+        cols.push({label:'Rough<br>AVG', key:'roughAvg', stat:true});
+      }
+      if(particleCount){
+        for(let i=1;i<=particleCount;i++) cols.push({label:`P${i}`, key:`particle${i}`});
+      }
+      cols.push({label:'備註', key:'note', noSort:true});
+      cols.push({label:'操作', key:'_act', noSort:true});
+
+      return '<tr>' + cols.map(c => {
+        const cls = [
+          (c.noSort ? '' : 'sortable'),
+          (c.sticky ? `sticky sticky-${c.sticky}` : ''),
+        ].filter(Boolean).join(' ');
+        const attr = c.noSort ? '' : ` data-key="${c.key}"`;
+        return `<th class="${cls}"${attr}>${c.label}</th>`;
+      }).join('') + '</tr>';
+    }
+
+    function rowSummary(row, partsId){
+      // 統計 Roughness / Particle 結果
+      const roughCount = getRoughCount(partsId, row?.pkitName);
+      const particleCount = getParticleCount(partsId);
+      const roughVals = [];
+      for(let i=1;i<=Math.max(roughCount,16);i++){ if(row['rough'+i]!=null && row['rough'+i] !== '') roughVals.push(row['rough'+i]); }
+      const partVals = [];
+      for(let i=1;i<=Math.max(particleCount,8);i++){ if(row['particle'+i]!=null && row['particle'+i] !== '') partVals.push(row['particle'+i]); }
+      return {
+        rough: computeStats(roughVals),
+        particle: computeStats(partVals),
+      };
+    }
+
+    function renderRowHtml(row, partsId){
+      const type = getPartType(partsId);
+      const id = escapeHtml(row.id);
+      if(type === 'rps'){
+        return `<tr data-id="${id}">
+          <td class="sticky sticky-1">${escapeHtml(row.tool)}</td>
+          <td class="sticky sticky-2">${escapeHtml(row.chamber)}</td>
+          <td class="sticky sticky-3">${escapeHtml(row.side)}</td>
+          <td class="sticky sticky-4">${escapeHtml(row.date)}</td>
+          <td class="sticky sticky-5">${escapeHtml(row.category)}</td>
+          <td class="sticky sticky-6">${escapeHtml(row.sn)}</td>
+          <td class="stat">${escapeHtml(row.hours)}</td>
+          <td class="stat">${escapeHtml(row.purgerCount)}</td>
+          <td class="stat">${escapeHtml(row.cleanBeforeIn)}</td>
+          <td class="stat">${escapeHtml(row.cleanBeforeOut)}</td>
+          <td class="stat">${escapeHtml(row.cleanAfterIn1)}</td>
+          <td class="stat">${escapeHtml(row.cleanAfterIn2)}</td>
+          <td class="stat">${escapeHtml(row.cleanAfterIn3)}</td>
+          <td class="stat">${escapeHtml(row.cleanAfterOut1)}</td>
+          <td class="stat">${escapeHtml(row.cleanAfterOut2)}</td>
+          <td class="stat">${escapeHtml(row.cleanAfterOut3)}</td>
+          <td class="stat">${escapeHtml(row.pa5)}</td>
+          <td>${escapeHtml(row.pmStaff)}</td>
+          <td>${escapeHtml(row.vendor)}</td>
+          <td class="note">${escapeHtml(row.note)}</td>
+          <td><div class="rowBtns">
+            <button class="btn small" type="button" data-edit="${id}">編輯</button>
+            <button class="btn small danger" type="button" data-del="${id}">刪除</button>
+          </div></td>
+        </tr>`;
+      }
+
+      const stats = rowSummary(row, partsId);
+      const showPkit = (type === 'processkits');
+      const showClean = hasCleanFields(partsId);
+      const showRough = type !== 'rps';
+      const particleCount = getParticleCount(partsId);
+
+      const cells = [];
+      cells.push(`<td class="sticky sticky-1">${escapeHtml(row.tool)}</td>`);
+      cells.push(`<td class="sticky sticky-2">${escapeHtml(row.chamber)}</td>`);
+      cells.push(`<td class="sticky sticky-3">${escapeHtml(row.side)}</td>`);
+      cells.push(`<td class="sticky sticky-4">${escapeHtml(row.pmDate)}</td>`);
+      if(showPkit) cells.push(`<td class="sticky sticky-5">${escapeHtml(row.pkitName)}</td>`);
+      cells.push(`<td class="sticky sticky-${showPkit?6:5}">${escapeHtml(row.sn)}</td>`);
+      cells.push(`<td>${escapeHtml(row.onDate)}</td>`);
+      cells.push(`<td>${escapeHtml(row.offDate)}</td>`);
+      cells.push(`<td>${escapeHtml(row.offReason)}</td>`);
+      if(showClean){
+        cells.push(`<td>${escapeHtml(row.cleanType)}</td>`);
+        cells.push(`<td class="stat">${escapeHtml(row.selfWash)}</td>`);
+        cells.push(`<td class="stat">${escapeHtml(row.vendorWash)}</td>`);
+      }
+      if(showRough){
+        const maxR = getMaxRoughCount(partsId);
+        for(let i=1;i<=maxR;i++) cells.push(`<td class="stat">${escapeHtml(row['rough'+i] ?? '')}</td>`);
+        cells.push(`<td class="stat">${escapeHtml(stats.rough.max)}</td>`);
+        cells.push(`<td class="stat">${escapeHtml(stats.rough.min)}</td>`);
+        cells.push(`<td class="stat">${escapeHtml(stats.rough.avg)}</td>`);
+      }
+      if(particleCount){
+        for(let i=1;i<=particleCount;i++) cells.push(`<td class="stat">${escapeHtml(row['particle'+i] ?? '')}</td>`);
+      }
+      cells.push(`<td class="note">${escapeHtml(row.note)}</td>`);
+      cells.push(`<td><div class="rowBtns">
+        <button class="btn small" type="button" data-edit="${id}">編輯</button>
+        <button class="btn small danger" type="button" data-del="${id}">刪除</button>
+      </div></td>`);
+
+      return `<tr data-id="${id}">${cells.join('')}</tr>`;
+    }
+
+    /* ============ 排序 / 搜尋 / render ============ */
+    const sortState = {};
+    function rowToSearchText(r){
+      return Object.values(r || {}).map(v => String(v ?? '')).join(' ').toLowerCase();
+    }
+    function compareValues(a, b, key){
+      // 統計欄位的 key 不是 row 上的欄位 → 用 partsId 計算
+      const sa = (a[key] ?? '').toString();
+      const sb = (b[key] ?? '').toString();
+      const na = parseFloat(sa), nb = parseFloat(sb);
+      if(!isNaN(na) && !isNaN(nb)) return na - nb;
+      return sa.localeCompare(sb, 'zh-Hant');
+    }
+    function withStatsRow(row, partsId){
+      const s = rowSummary(row, partsId);
+      return Object.assign({}, row, {
+        roughMax:s.rough.max, roughMin:s.rough.min, roughAvg:s.rough.avg,
+      });
+    }
+    function render(partsId){
+      const tbody = document.querySelector(`tbody[data-tbody="${partsId}"]`);
+      if(!tbody) return;
+      const q = (document.querySelector(`input[data-search="${partsId}"]`)?.value || '').trim().toLowerCase();
+      let rows = loadRows(partsId);
+      if(q) rows = rows.filter(r => rowToSearchText(r).includes(q));
+      const info = sortState[partsId];
+      if(info){
+        const enriched = rows.map(r => withStatsRow(r, partsId));
+        enriched.sort((a,b) => {
+          const cmp = compareValues(a,b,info.key);
+          return info.dir === 'asc' ? cmp : -cmp;
+        });
+        rows = enriched;
+      }
+      tbody.innerHTML = rows.map(r => renderRowHtml(r, partsId)).join('');
+
+      tbody.onclick = ev => {
+        const editBtn = ev.target.closest('button[data-edit]');
+        const delBtn  = ev.target.closest('button[data-del]');
+        if(editBtn){
+          const id = editBtn.getAttribute('data-edit');
+          const rs = loadRows(partsId);
+          const row = rs.find(r => r.id === id);
+          if(!row) return;
+          const form = document.querySelector(`form[data-form="${partsId}"]`);
+          if(!form) return;
+          // 保留快照與編輯標記：submit 時才實際取代，reset 時可恢復
+          form._editId = id;
+          form._editSnapshot = JSON.parse(JSON.stringify(row));
+          fillForm(form, row, partsId);
+          // 切回填寫模式
+          const stackEl = form.closest('.stack');
+          stackEl?.querySelectorAll('.mode-toggle .mode-btn').forEach(b => {
+            const isSubmit = b.getAttribute('data-mode') === 'submit';
+            b.classList.toggle('active', isSubmit);
+          });
+          const sectionEl = stackEl?.querySelector('.section.layout');
+          sectionEl?.querySelector('.form-pane')?.style?.setProperty('display','');
+          const lp = sectionEl?.querySelector('.list-pane'); if(lp) lp.style.display = 'none';
+        }
+        if(delBtn){
+          const id = delBtn.getAttribute('data-del');
+          if(!confirm('確定刪除這筆資料？')) return;
+          saveRows(partsId, loadRows(partsId).filter(r => r.id !== id));
+          render(partsId);
+        }
+      };
+    }
+
+    /* ============ Tablist 切換 ============ */
+    function setupTablist(tablistEl){
+      const tabs = Array.from(tablistEl.querySelectorAll('[role="tab"]'));
+      function activate(tab){
+        tabs.forEach(t => {
+          const selected = (t === tab);
+          t.setAttribute('aria-selected', selected ? 'true':'false');
+          const panel = document.getElementById(t.getAttribute('aria-controls'));
+          if(panel) panel.hidden = !selected;
+        });
+      }
+      tabs.forEach(t => t.addEventListener('click', () => activate(t)));
+      const cur = tabs.find(t => t.getAttribute('aria-selected') === 'true') || tabs[0];
+      if(cur) activate(cur);
+    }
+    document.querySelectorAll('.tabs[role="tablist"]').forEach(setupTablist);
+
+    /* 全域共用一個 file input：所有「匯入 Excel」按鈕都觸發它 */
+    (() => {
+      const fileInput = document.getElementById('import-file-input');
+      fileInput.addEventListener('change', async ev => {
+        const file = ev.target.files?.[0];
+        if(!file) return;
+        try{
+          await importWorkbookFile(file);
+        }catch(err){
+          console.error(err);
+          alert('匯入失敗：' + (err?.message || err));
+        }finally{
+          ev.target.value = '';
+        }
+      });
+    })();
+
+    /* ============ 每個 parts 子頁初始化 ============ */
+    const tpl = document.getElementById('partsPageTemplate');
+    parts.forEach(p => {
+      const host = document.getElementById('panel-' + p.id);
+      if(!host || !tpl) return;
+      const node = tpl.content.cloneNode(true);
+      const hdr = node.querySelector('.hdr');
+      const listHdr = node.querySelector('.listHdr');
+      const form = node.querySelector('form.form');
+      const search = node.querySelector('input.search');
+      const tbody = node.querySelector('tbody');
+      const thead = node.querySelector('thead');
+
+      hdr.textContent = p.label + '（填寫）';
+      listHdr.textContent = p.label + '（清單）';
+
+      form.setAttribute('data-form', p.id);
+      search.setAttribute('data-search', p.id);
+      tbody.setAttribute('data-tbody', p.id);
+
+      // Mode toggle + icon
+      const stackEl = node.querySelector('.stack');
+      const sectionEl = stackEl.querySelector('.section.layout');
+      const formPane = sectionEl.querySelector('.form-pane');
+      const listPane = sectionEl.querySelector('.list-pane');
+      const modeBtns = stackEl.querySelectorAll('.mode-toggle .mode-btn');
+      modeBtns.forEach(btn => {
+        if(!btn.querySelector('.icon')){
+          const text = btn.textContent.trim();
+          btn.textContent = '';
+          const i = document.createElement('span'); i.className='icon';
+          const l = document.createElement('span'); l.className='label'; l.textContent=text;
+          btn.append(i,l);
+        }
+      });
+      const showMode = m => {
+        // 切到「清單」時：解除編輯狀態並清空表單，下次要編輯請重新點清單內「編輯」按鈕
+        if(m === 'list' && form._editId){
+          form._editId = null;
+          form._editSnapshot = null;
+          renderForm(form, p.id);
+        }
+        formPane.style.display = (m === 'submit') ? '' : 'none';
+        listPane.style.display = (m === 'list') ? '' : 'none';
+        modeBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-mode')===m));
+      };
+      showMode('submit');
+      modeBtns.forEach(b => b.addEventListener('click', () => showMode(b.getAttribute('data-mode'))));
+
+      // 範例 Excel 下載 / 匯入（共用全域 file input）
+      stackEl.querySelector('[data-action="download-template"]')
+        ?.addEventListener('click', downloadAllTemplate);
+      stackEl.querySelector('[data-action="import-excel"]')
+        ?.addEventListener('click', () => {
+          const fi = document.getElementById('import-file-input');
+          fi.value = '';
+          fi.click();
+        });
+      stackEl.querySelector('[data-action="export-excel"]')
+        ?.addEventListener('click', downloadAllExport);
+      stackEl.querySelector('[data-action="trend-chart"]')
+        ?.addEventListener('click', () => window.open('./trend.html', '_blank'));
+      stackEl.querySelector('[data-action="dedup"]')
+        ?.addEventListener('click', () => dedupCurrent(p.id));
+
+      // 建立表單 + 表頭
+      renderForm(form, p.id);
+      thead.innerHTML = makeHeaderHtml(p.id);
+      thead.querySelectorAll('th.sortable').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.getAttribute('data-key');
+          const cur = sortState[p.id];
+          let dir = 'asc';
+          if(cur && cur.key === key && cur.dir === 'asc') dir = 'desc';
+          sortState[p.id] = { key, dir };
+          thead.querySelectorAll('th.sortable').forEach(o => o.removeAttribute('data-sort-dir'));
+          th.setAttribute('data-sort-dir', dir);
+          render(p.id);
+        });
+      });
+
+      // submit
+      form.addEventListener('submit', ev => {
+        ev.preventDefault();
+        const fd = new FormData(form);
+        const row = Object.fromEntries(fd.entries());
+        Object.keys(row).forEach(k => { if(row[k]!=null) row[k] = String(row[k]).trim(); });
+
+        const rows = loadRows(p.id);
+        if(form._editId){
+          // 編輯模式：替換原 row（沿用舊 id）
+          row.id = form._editId;
+          const idx = rows.findIndex(r => r.id === form._editId);
+          if(idx !== -1) rows[idx] = row;
+          else rows.unshift(row);
+          form._editId = null;
+          form._editSnapshot = null;
+        }else{
+          // 新增模式
+          row.id = (crypto?.randomUUID ? crypto.randomUUID()
+            : String(Date.now()) + '-' + Math.random().toString(16).slice(2));
+          rows.unshift(row);
+        }
+        saveRows(p.id, rows);
+
+        renderForm(form, p.id);
+        render(p.id);
+      });
+
+      // Reset 行為：編輯模式 → 恢復原內容；新增模式 → 重新渲染（回到初始預設值）
+      form.addEventListener('reset', ev => {
+        ev.preventDefault();
+        if(form._editId && form._editSnapshot){
+          renderForm(form, p.id);
+          fillForm(form, form._editSnapshot, p.id);
+        }else{
+          renderForm(form, p.id);
+        }
+      });
+
+      search.addEventListener('input', () => render(p.id));
+      host.appendChild(node);
+
+      render(p.id);
+      syncFromServer(p.id);
+      setInterval(() => syncFromServer(p.id), 30000);
+    });
+  </script>
+</body>
+</html>
