@@ -790,6 +790,12 @@
           cctx.font = 'bold 13px system-ui, sans-serif';
           cctx.textAlign = 'center';
           cctx.textBaseline = 'middle';
+          // 已畫的 Δ label 矩形，用於偵測重疊
+          const drawn = [];
+          const overlaps = (a, b) => !(a.x + a.w < b.x || b.x + b.w < a.x ||
+                                       a.y + a.h < b.y || b.y + b.h < a.y);
+          // 收集所有候選 label：先算 x（靠 dataset 順序，讓後畫的 dataset 蓋前面），穩定
+          const candidates = [];
           c.data.datasets.forEach((ds, di) => {
             const meta = c.getDatasetMeta(di);
             if(!meta || meta.hidden) return;
@@ -799,46 +805,61 @@
               if(!p0 || !p1) continue;
               const y0 = ds.data[i-1]?.y, y1 = ds.data[i]?.y;
               if(!Number.isFinite(y0) || !Number.isFinite(y1)) continue;
-              const delta = y1 - y0;
-              const midX = (p0.x + p1.x) / 2;
-              // 位置：連線中點往上偏 16px 避開折線
-              const midY = (p0.y + p1.y) / 2 - 16;
-              const label = (delta >= 0 ? '+' : '') + delta.toFixed(2);
-              const color = delta > 0 ? '#c62828'
-                          : delta < 0 ? '#2e7d32'
-                          : '#374151';
-              // 白底圓角矩形 + 邊框：完全遮住底下的折線，Δ 值不會與線條混亂
-              const metrics = cctx.measureText(label);
-              const padX = 6, padY = 3;
-              const w = metrics.width + padX * 2;
-              const h = 18;
-              const rx = midX - w/2;
-              const ry = midY - h/2;
-              cctx.beginPath();
-              if(cctx.roundRect){
-                cctx.roundRect(rx, ry, w, h, 6);
-              }else{
-                const r = 6;
-                cctx.moveTo(rx+r, ry);
-                cctx.lineTo(rx+w-r, ry);
-                cctx.quadraticCurveTo(rx+w, ry, rx+w, ry+r);
-                cctx.lineTo(rx+w, ry+h-r);
-                cctx.quadraticCurveTo(rx+w, ry+h, rx+w-r, ry+h);
-                cctx.lineTo(rx+r, ry+h);
-                cctx.quadraticCurveTo(rx, ry+h, rx, ry+h-r);
-                cctx.lineTo(rx, ry+r);
-                cctx.quadraticCurveTo(rx, ry, rx+r, ry);
-                cctx.closePath();
-              }
-              cctx.fillStyle = 'rgba(255,255,255,.97)';
-              cctx.fill();
-              cctx.lineWidth = 1.3;
-              cctx.strokeStyle = color;
-              cctx.stroke();
-              cctx.fillStyle = color;
-              cctx.fillText(label, midX, midY + 0.5);
+              candidates.push({ p0, p1, delta: y1 - y0 });
             }
           });
+          // 由 X 座標排序，讓左右相鄰的 Δ 優先度一致
+          candidates.sort((a, b) => (a.p0.x + a.p1.x) - (b.p0.x + b.p1.x));
+
+          for(const cand of candidates){
+            const { p0, p1, delta } = cand;
+            const label = (delta >= 0 ? '+' : '') + delta.toFixed(2);
+            const color = delta > 0 ? '#c62828' : delta < 0 ? '#2e7d32' : '#374151';
+            const metrics = cctx.measureText(label);
+            const padX = 6;
+            const w = metrics.width + padX * 2;
+            const h = 18;
+            const midX = (p0.x + p1.x) / 2;
+            const midYBase = (p0.y + p1.y) / 2;
+            // 嘗試多個垂直位置：優先中點上方 16px，若重疊則往上或往下再試
+            const yOffsets = [-16, -34, -52, 16, 34, 52, -70, 70];
+            let placed = null;
+            for(const off of yOffsets){
+              const midY = midYBase + off;
+              const rect = { x: midX - w/2, y: midY - h/2, w, h };
+              if(!drawn.some(r => overlaps(r, rect))){
+                placed = { midY, rect };
+                break;
+              }
+            }
+            if(!placed) continue;   // 全部位置都重疊 → 跳過此 label 避免畫面混亂
+            drawn.push(placed.rect);
+            const { midY, rect } = placed;
+            const rx = rect.x, ry = rect.y;
+            cctx.beginPath();
+            if(cctx.roundRect){
+              cctx.roundRect(rx, ry, w, h, 6);
+            }else{
+              const r = 6;
+              cctx.moveTo(rx+r, ry);
+              cctx.lineTo(rx+w-r, ry);
+              cctx.quadraticCurveTo(rx+w, ry, rx+w, ry+r);
+              cctx.lineTo(rx+w, ry+h-r);
+              cctx.quadraticCurveTo(rx+w, ry+h, rx+w-r, ry+h);
+              cctx.lineTo(rx+r, ry+h);
+              cctx.quadraticCurveTo(rx, ry+h, rx, ry+h-r);
+              cctx.lineTo(rx, ry+r);
+              cctx.quadraticCurveTo(rx, ry, rx+r, ry);
+              cctx.closePath();
+            }
+            cctx.fillStyle = 'rgba(255,255,255,.97)';
+            cctx.fill();
+            cctx.lineWidth = 1.3;
+            cctx.strokeStyle = color;
+            cctx.stroke();
+            cctx.fillStyle = color;
+            cctx.fillText(label, midX, midY + 0.5);
+          }
           cctx.restore();
         }
       };
@@ -884,7 +905,13 @@
               ticks: {
                 color:'#1f2a44',
                 font:{ weight:'700', size:14 },
-                callback: v => xMode === 'time' ? formatDate(v) : v,
+                // 清洗次數模式：只顯示整數 tick、間距 1；時間模式維持自動
+                ...(xMode === 'time' ? {} : { stepSize: 1, precision: 0 }),
+                callback: v => {
+                  if(xMode === 'time') return formatDate(v);
+                  // 只顯示整數，非整數 tick 隱藏
+                  return Number.isInteger(v) ? v : null;
+                },
               },
               grid: { color:'rgba(60,90,170,.18)' },
               border: { color:'#3b4a6b', width:1.5 },
