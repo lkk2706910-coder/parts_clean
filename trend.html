@@ -73,12 +73,30 @@
     select option,select optgroup{background-color:#fff;color:var(--text)}
     select option:checked{background:var(--accent-soft);color:var(--accent-dark)}
     select:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94,124,240,.18)}
-    /* multi-select 樣式：白底、每 option 帶 padding、選中變藍紫 */
-    select[multiple]{padding:4px;height:auto;min-height:110px;max-height:160px;overflow-y:auto}
-    select[multiple] option{padding:5px 8px;border-radius:5px;margin:1px 0;cursor:pointer}
-    select[multiple] option:checked{background:linear-gradient(135deg,var(--accent-soft),rgba(139,92,246,.18));color:var(--accent-dark);font-weight:700}
-    select[multiple] option:hover{background:#f4f7ff}
     .multi-hint{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:0}
+    /* ============ Excel 風 MultiSelect (checkbox dropdown) ============ */
+    .ms{position:relative;width:100%}
+    .ms-btn{width:100%;padding:8px 30px 8px 12px;border-radius:8px;border:1px solid var(--border-soft);background:#fff;color:var(--text);cursor:pointer;text-align:left;font-size:13px;font-weight:600;transition:border-color .15s,box-shadow .15s;position:relative;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.4}
+    .ms-btn::after{content:'▾';position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--accent);font-size:11px;pointer-events:none}
+    .ms-btn:hover{border-color:var(--accent);background:#fbfcff}
+    .ms.open .ms-btn{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94,124,240,.18);background:#fff}
+    .ms-count{display:inline-block;margin-left:4px;padding:1px 8px;border-radius:999px;background:var(--grad-primary);color:#fff;font-size:11px;font-weight:800;vertical-align:middle}
+    .ms-menu{position:absolute;top:calc(100% + 4px);left:0;right:0;min-width:220px;max-width:360px;background:#fff;border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 12px 32px rgba(70,110,200,.22),0 4px 10px rgba(70,110,200,.10);z-index:100;overflow:hidden;display:flex;flex-direction:column}
+    .ms-search-wrap{padding:8px 8px 4px;background:#f7f9fd;border-bottom:1px solid var(--border-soft)}
+    .ms-search{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--border-soft);background:#fff;font-size:12.5px;color:var(--text);outline:none}
+    .ms-search:focus{border-color:var(--accent);box-shadow:0 0 0 2px rgba(94,124,240,.15)}
+    .ms-all{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#eef3ff;font-size:12.5px;font-weight:800;color:var(--accent-dark);cursor:pointer;user-select:none;border-bottom:1px solid var(--border-soft)}
+    .ms-all input{width:auto;margin:0;cursor:pointer;accent-color:var(--accent)}
+    .ms-list{max-height:220px;overflow-y:auto;padding:4px}
+    .ms-list::-webkit-scrollbar{width:8px}
+    .ms-list::-webkit-scrollbar-track{background:transparent}
+    .ms-list::-webkit-scrollbar-thumb{background:rgba(94,124,240,.35);border-radius:4px}
+    .ms-item{display:flex;align-items:center;gap:8px;padding:6px 10px;font-size:13px;color:var(--text);cursor:pointer;border-radius:6px;user-select:none;transition:background .1s}
+    .ms-item:hover{background:var(--accent-soft)}
+    .ms-item input{width:auto;margin:0;cursor:pointer;accent-color:var(--accent)}
+    .ms-item.checked{background:linear-gradient(135deg,var(--accent-soft),rgba(139,92,246,.14));color:var(--accent-dark);font-weight:700}
+    .ms-group-title{padding:6px 10px 3px;font-size:10.5px;font-weight:800;color:var(--accent-dark);letter-spacing:.05em;text-transform:uppercase;background:#f7f9fd}
+    .ms-empty{padding:12px;text-align:center;color:var(--muted);font-size:12px}
     .chart-host{position:relative;background:linear-gradient(180deg,#fbfcff 0%,#f5f8fe 100%);border:1px solid var(--border-soft);border-radius:12px;padding:14px;min-height:460px;box-shadow:inset 0 0 0 1px rgba(94,124,240,.04)}
     canvas{width:100% !important;max-height:520px}
     .info{margin-top:10px;color:var(--muted);font-size:12px}
@@ -115,29 +133,24 @@
     <div class="card">
       <div class="filters">
         <div>
-          <label class="field">PART 類型 <span class="multi-hint">(可複選 · 未選=全部)</span></label>
-          <select id="f-type" multiple size="4">
-            <option value="faceplate">FACE PLATE</option>
-            <option value="blockplate">BLOCK PLATE</option>
-            <option value="processkits">PROCESS KITS</option>
-            <option value="heater">HEATER</option>
-          </select>
+          <label class="field">PART 類型 <span class="multi-hint">(可複選)</span></label>
+          <div class="ms" id="ms-type"></div>
         </div>
         <div>
           <label class="field">機型 (Group) <span class="multi-hint">(可複選)</span></label>
-          <select id="f-group" multiple size="4"></select>
+          <div class="ms" id="ms-group"></div>
         </div>
         <div>
           <label class="field">機台 (Tool) <span class="multi-hint">(可複選)</span></label>
-          <select id="f-tool" multiple size="4"></select>
+          <div class="ms" id="ms-tool"></div>
         </div>
         <div id="pkit-wrap" hidden>
           <label class="field">品名 (Process Kits) <span class="multi-hint">(可複選)</span></label>
-          <select id="f-pkit" multiple size="4"></select>
+          <div class="ms" id="ms-pkit"></div>
         </div>
         <div>
           <label class="field">Parts S/N <span class="multi-hint">(可複選 · 依 SN 分線)</span></label>
-          <select id="f-sn" multiple size="4"></select>
+          <div class="ms" id="ms-sn"></div>
         </div>
         <div>
           <label class="field">Y 軸 (Roughness)</label>
@@ -387,12 +400,7 @@
 
     /* ============ 篩選器 / 圖表 ============ */
     const els = {
-      type: document.getElementById('f-type'),
-      group:document.getElementById('f-group'),
-      tool: document.getElementById('f-tool'),
-      pkit: document.getElementById('f-pkit'),
       pkitWrap: document.getElementById('pkit-wrap'),
-      sn:   document.getElementById('f-sn'),
       yAxis:document.getElementById('f-y'),
       xAxis:document.getElementById('f-x'),
       showDelta: document.getElementById('f-delta'),
@@ -401,6 +409,7 @@
     };
     let chart = null;
     let showDelta = !!(els.showDelta && els.showDelta.checked);
+    const ms = {};   // Excel 風 MultiSelect 實例，setupFilters 內建立
     const debugEl = document.getElementById('debug');
     function writeDebug(lines){
       const txt = Array.isArray(lines) ? lines.join('\n') : String(lines);
@@ -408,51 +417,181 @@
       console.log('[trend]', txt);
     }
 
-    /* 讀多選 select 為字串陣列；未選任何 = 空陣列 = 「全部」語意 */
-    function readMulti(el){
-      if(!el) return [];
-      return Array.from(el.selectedOptions).map(o => o.value).filter(v => v !== '');
-    }
-    /* 產生 option HTML，保留已選狀態 */
-    function optionHtml(value, label, keep){
-      const sel = keep.includes(value) ? ' selected' : '';
-      return `<option value="${escapeAttr(value)}"${sel}>${escapeText(label)}</option>`;
-    }
     function escapeAttr(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
     function escapeText(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
+    /* ============ Excel 風 MultiSelect ============ */
+    class MultiSelect {
+      constructor(host, opts){
+        this.host = host;
+        host._ms = this;
+        this.placeholder = opts?.placeholder || '請選擇';
+        this.options = [];   // [{value, label, group?}]
+        this.values = new Set();
+        this.filter = '';
+        this.onChange = opts?.onChange || null;
+        this._build();
+      }
+      _build(){
+        this.host.innerHTML =
+          '<button type="button" class="ms-btn"></button>' +
+          '<div class="ms-menu" hidden>' +
+            '<div class="ms-search-wrap"><input type="search" class="ms-search" placeholder="搜尋…" /></div>' +
+            '<label class="ms-all"><input type="checkbox" class="ms-cb-all" /><span>全選 / 取消全選</span></label>' +
+            '<div class="ms-list"></div>' +
+          '</div>';
+        this.btn    = this.host.querySelector('.ms-btn');
+        this.menu   = this.host.querySelector('.ms-menu');
+        this.search = this.host.querySelector('.ms-search');
+        this.cbAll  = this.host.querySelector('.ms-cb-all');
+        this.list   = this.host.querySelector('.ms-list');
+
+        this.btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const wasOpen = !this.menu.hidden;
+          MultiSelect.closeAll(this);
+          if(wasOpen){ this.close(); } else { this.open(); }
+        });
+        this.menu.addEventListener('click', e => e.stopPropagation());
+        this.search.addEventListener('input', () => {
+          this.filter = this.search.value.trim().toLowerCase();
+          this._renderList();
+          this._updateAllCheckbox();
+        });
+        this.cbAll.addEventListener('change', () => {
+          const visible = this._visibleOptions();
+          if(this.cbAll.checked) visible.forEach(o => this.values.add(o.value));
+          else                    visible.forEach(o => this.values.delete(o.value));
+          this._renderList();
+          this._updateBtn();
+          this.onChange && this.onChange();
+        });
+        this.list.addEventListener('change', e => {
+          const cb = e.target;
+          if(cb.type !== 'checkbox') return;
+          if(cb.checked) this.values.add(cb.value);
+          else           this.values.delete(cb.value);
+          const item = cb.closest('.ms-item');
+          if(item) item.classList.toggle('checked', cb.checked);
+          this._updateAllCheckbox();
+          this._updateBtn();
+          this.onChange && this.onChange();
+        });
+      }
+      open(){ this.menu.hidden = false; this.host.classList.add('open'); this.search.focus(); }
+      close(){
+        this.menu.hidden = true;
+        this.host.classList.remove('open');
+        if(this.filter){ this.filter=''; this.search.value=''; this._renderList(); this._updateAllCheckbox(); }
+      }
+      static closeAll(except){
+        document.querySelectorAll('.ms.open').forEach(el => {
+          if(el._ms && (!except || el !== except.host)) el._ms.close();
+        });
+      }
+      setOptions(options){
+        this.options = options || [];
+        const valid = new Set(this.options.map(o => o.value));
+        Array.from(this.values).forEach(v => { if(!valid.has(v)) this.values.delete(v); });
+        this._renderList();
+        this._updateAllCheckbox();
+        this._updateBtn();
+      }
+      setValues(arr){
+        this.values = new Set(arr);
+        this._renderList();
+        this._updateAllCheckbox();
+        this._updateBtn();
+      }
+      getValues(){ return Array.from(this.values); }
+      _visibleOptions(){
+        if(!this.filter) return this.options;
+        return this.options.filter(o =>
+          (o.label && String(o.label).toLowerCase().includes(this.filter)) ||
+          (o.value && String(o.value).toLowerCase().includes(this.filter))
+        );
+      }
+      _renderList(){
+        const visible = this._visibleOptions();
+        if(visible.length === 0){
+          this.list.innerHTML = '<div class="ms-empty">' + (this.options.length === 0 ? '無選項' : '找不到符合的項目') + '</div>';
+          return;
+        }
+        let html = '';
+        let lastGroup = null;
+        visible.forEach(o => {
+          if(o.group && o.group !== lastGroup){
+            html += '<div class="ms-group-title">' + escapeText(o.group) + '</div>';
+            lastGroup = o.group;
+          }else if(!o.group){ lastGroup = null; }
+          const checked = this.values.has(o.value);
+          html += '<label class="ms-item' + (checked ? ' checked' : '') + '">' +
+                    '<input type="checkbox" value="' + escapeAttr(o.value) + '"' + (checked ? ' checked' : '') + ' />' +
+                    '<span>' + escapeText(o.label) + '</span>' +
+                  '</label>';
+        });
+        this.list.innerHTML = html;
+      }
+      _updateAllCheckbox(){
+        const visible = this._visibleOptions();
+        if(visible.length === 0){ this.cbAll.checked=false; this.cbAll.indeterminate=false; return; }
+        const sel = visible.filter(o => this.values.has(o.value)).length;
+        if(sel === 0){ this.cbAll.checked=false; this.cbAll.indeterminate=false; }
+        else if(sel === visible.length){ this.cbAll.checked=true; this.cbAll.indeterminate=false; }
+        else { this.cbAll.checked=false; this.cbAll.indeterminate=true; }
+      }
+      _updateBtn(){
+        const total = this.options.length;
+        const count = this.values.size;
+        if(count === 0){
+          this.btn.innerHTML = escapeText(this.placeholder) + ' <span style="color:var(--muted);font-weight:600;font-size:11px">(全部)</span>';
+        }else if(count === total){
+          this.btn.innerHTML = escapeText(this.placeholder) + ' <span class="ms-count">全 ' + count + '</span>';
+        }else if(count === 1){
+          const one = this.options.find(o => this.values.has(o.value));
+          this.btn.textContent = one ? one.label : this.placeholder;
+        }else{
+          this.btn.innerHTML = escapeText(this.placeholder) + ' <span class="ms-count">' + count + '</span>';
+        }
+      }
+    }
+    /* 點外面 / Esc 收起所有下拉 */
+    document.addEventListener('click', () => MultiSelect.closeAll(null));
+    document.addEventListener('keydown', e => { if(e.key === 'Escape') MultiSelect.closeAll(null); });
+
+    function fillTypeSelect(){
+      ms.type.setOptions([
+        {value:'faceplate',   label:'FACE PLATE'},
+        {value:'blockplate',  label:'BLOCK PLATE'},
+        {value:'processkits', label:'PROCESS KITS'},
+        {value:'heater',      label:'HEATER'},
+      ]);
+    }
     function fillGroupSelect(){
-      const keep = readMulti(els.group);
-      els.group.innerHTML = GROUPS.map(g => optionHtml(g, GROUP_LABEL[g] || g.toUpperCase(), keep)).join('');
+      ms.group.setOptions(GROUPS.map(g => ({value:g, label:GROUP_LABEL[g] || g.toUpperCase()})));
     }
     function fillToolSelect(){
-      const groups = readMulti(els.group);
+      const groups = ms.group.getValues();
       const groupsToShow = groups.length ? groups : GROUPS;
-      const keep = readMulti(els.tool);
-      els.tool.innerHTML = groupsToShow.map(gid =>
-        `<optgroup label="${escapeAttr(GROUP_LABEL[gid] || gid.toUpperCase())}">` +
-          TOOL_OPTIONS[gid].map(t => optionHtml(t, t, keep)).join('') +
-        '</optgroup>'
-      ).join('');
+      const opts = [];
+      groupsToShow.forEach(gid => {
+        TOOL_OPTIONS[gid].forEach(t => opts.push({value:t, label:t, group:GROUP_LABEL[gid] || gid.toUpperCase()}));
+      });
+      ms.tool.setOptions(opts);
     }
     function fillPkitSelect(){
-      const keep = readMulti(els.pkit);
-      els.pkit.innerHTML = PKIT_ALL.map(p => optionHtml(p, p, keep)).join('');
+      ms.pkit.setOptions(PKIT_ALL.map(p => ({value:p, label:p})));
     }
-
-    /* 把目前篩選下「可選」的 S/N 列出，保留已選中且仍存在的 SN */
     function refreshSnOptions(){
-      const types = readMulti(els.type);
-      const groups= readMulti(els.group);
-      const tools = readMulti(els.tool);
-      const pkits = types.includes('processkits') ? readMulti(els.pkit) : [];
-      const sns = new Set();
+      const types  = ms.type.getValues();
+      const groups = ms.group.getValues();
+      const tools  = ms.tool.getValues();
+      const pkits  = (types.length === 0 || types.includes('processkits')) ? ms.pkit.getValues() : [];
+      const snSet = new Set();
       collectFilteredRows({types, groups, tools, pkits, sns:[]}).forEach(({row}) => {
-        if(row.sn) sns.add(row.sn);
+        if(row.sn) snSet.add(row.sn);
       });
-      const keep = readMulti(els.sn);
-      els.sn.innerHTML = Array.from(sns).sort()
-        .map(s => optionHtml(s, s, keep)).join('');
+      ms.sn.setOptions(Array.from(snSet).sort().map(s => ({value:s, label:s})));
     }
 
     /* 收集符合條件的 row；每個篩選傳陣列，空陣列 = 「全部」 */
@@ -517,11 +656,11 @@
           '解法二：把 <a href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" target="_blank">chart.umd.min.js</a> 與 <a href="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" target="_blank">xlsx.full.min.js</a> 下載後放到 <code>./libs/</code> 資料夾（跟 trend.html 同層）。';
         return;
       }
-      const types  = readMulti(els.type);
-      const groups = readMulti(els.group);
-      const tools  = readMulti(els.tool);
-      const pkits  = types.includes('processkits') || types.length === 0 ? readMulti(els.pkit) : [];
-      const sns    = readMulti(els.sn);
+      const types  = ms.type.getValues();
+      const groups = ms.group.getValues();
+      const tools  = ms.tool.getValues();
+      const pkits  = (types.length === 0 || types.includes('processkits')) ? ms.pkit.getValues() : [];
+      const sns    = ms.sn.getValues();
       const yKey   = els.yAxis.value;     // 'max'/'min'/'avg'
       const xMode  = els.xAxis.value;     // 'time' / 'selfWash' / 'vendorWash'
 
@@ -760,9 +899,23 @@
 
     /* ============ 初始化 ============ */
     function syncPkitVisibility(){
-      // 未選任何 PART 類型（=全部）或選了 processkits 就顯示品名下拉
-      const types = readMulti(els.type);
+      const types = ms.type.getValues();
       els.pkitWrap.hidden = types.length > 0 && !types.includes('processkits');
+    }
+    function setupFilters(){
+      ms.type  = new MultiSelect(document.getElementById('ms-type'),  {placeholder:'PART 類型', onChange:onFilterChange('type')});
+      ms.group = new MultiSelect(document.getElementById('ms-group'), {placeholder:'機型',      onChange:onFilterChange('group')});
+      ms.tool  = new MultiSelect(document.getElementById('ms-tool'),  {placeholder:'機台',      onChange:onFilterChange('tool')});
+      ms.pkit  = new MultiSelect(document.getElementById('ms-pkit'),  {placeholder:'品名',      onChange:onFilterChange('pkit')});
+      ms.sn    = new MultiSelect(document.getElementById('ms-sn'),    {placeholder:'Parts S/N', onChange:onFilterChange('sn')});
+    }
+    function onFilterChange(kind){
+      return () => {
+        if(kind === 'type'){ syncPkitVisibility(); refreshSnOptions(); }
+        if(kind === 'group'){ fillToolSelect(); refreshSnOptions(); }
+        if(kind === 'tool' || kind === 'pkit'){ refreshSnOptions(); }
+        refreshChart();
+      };
     }
 
     function whenChartJsReady(){
@@ -781,6 +934,8 @@
     }
 
     (async () => {
+      setupFilters();
+      fillTypeSelect();
       fillGroupSelect();
       fillToolSelect();
       fillPkitSelect();
@@ -791,13 +946,9 @@
       refreshSnOptions();
       refreshChart();
 
-      [els.type, els.group, els.tool, els.pkit, els.sn, els.yAxis, els.xAxis].forEach(el => {
-        el.addEventListener('change', () => {
-          if(el === els.type){ syncPkitVisibility(); refreshSnOptions(); }
-          if(el === els.group){ fillToolSelect(); refreshSnOptions(); }
-          if(el === els.tool || el === els.pkit){ refreshSnOptions(); }
-          refreshChart();
-        });
+      // Y 軸 / X 軸下拉維持 native (單選)
+      [els.yAxis, els.xAxis].forEach(el => {
+        el.addEventListener('change', refreshChart);
       });
 
       // Δ 值 checkbox 獨立處理：只做 chart.update()，不重跑資料收集與 refreshChart，避免篩選內容視覺復歸
