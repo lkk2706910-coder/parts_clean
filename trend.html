@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Trend Chart - Parts Clean</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <style>
+    :root{
+      --bg-page:#f3f6fc;
+      --bg-card:#ffffff;
+      --text:#1f2a44;
+      --text-soft:#3b4a6b;
+      --muted:#6c7a99;
+      --border-soft:#e2e8f3;
+      --border-strong:#cdd7ec;
+      --shadow:0 14px 36px rgba(70,110,200,.12),0 2px 6px rgba(70,110,200,.05);
+      --accent:#5b8def;
+      --accent-2:#8b5cf6;
+      --accent-soft:#eaf0ff;
+      --accent-dark:#3b66cf;
+      --grad-primary:linear-gradient(135deg,#5b8def 0%,#8b5cf6 100%);
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;overflow-x:hidden}
+    body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;background:radial-gradient(1100px 600px at 10% 0%,#dbe5ff 0%,transparent 60%),radial-gradient(900px 600px at 90% 5%,#f1e0ff 0%,transparent 55%),radial-gradient(800px 500px at 50% 110%,#d6f1ff 0%,transparent 60%),var(--bg-page);color:var(--text);min-height:100vh}
+    .wrap{max-width:1500px;margin:18px auto 40px;padding:0 14px}
+    .title{text-align:center;font-weight:900;letter-spacing:.3px;margin:6px 0 16px;font-size:26px;background:var(--grad-primary);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;color:transparent}
+    .card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;min-width:0}
+    .filters{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px 10px;align-items:end;margin-bottom:14px}
+    @media (max-width:1280px){.filters{grid-template-columns:repeat(4,minmax(0,1fr))}}
+    @media (max-width:900px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media (max-width:680px){.filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    label.field{display:block;font-size:12px;color:var(--muted);margin:0 0 4px;font-weight:800;letter-spacing:.04em}
+    select,input{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border-soft);background:#fff;color:var(--text);outline:none;font-size:13px;transition:border-color .15s,box-shadow .15s}
+    select option,select optgroup{background-color:#fff;color:var(--text)}
+    select option:checked{background:var(--accent-soft);color:var(--accent-dark)}
+    select:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94,124,240,.18)}
+    .chart-host{position:relative;background:linear-gradient(180deg,#fbfcff 0%,#f5f8fe 100%);border:1px solid var(--border-soft);border-radius:12px;padding:14px;min-height:460px;box-shadow:inset 0 0 0 1px rgba(94,124,240,.04)}
+    canvas{width:100% !important;max-height:520px}
+    .info{margin-top:10px;color:var(--muted);font-size:12px}
+    .info b{color:var(--text-soft)}
+    .empty{display:flex;align-items:center;justify-content:center;height:420px;color:var(--muted);font-size:14px}
+    .debug-box{margin-top:14px;background:#f5f8fe;border:1px solid var(--border-soft);border-radius:10px;padding:10px}
+    .debug-box summary{cursor:pointer;color:var(--accent-dark);font-weight:800;font-size:13px}
+    .debug-box pre{margin:8px 0 0;color:var(--text-soft);font-size:11.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;max-height:300px;overflow:auto;background:#fff;border:1px solid var(--border-soft);border-radius:8px;padding:8px}
+    .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+    .back-link{color:var(--accent-dark);text-decoration:none;font-size:13px;font-weight:800;padding:7px 12px;border:1px solid var(--border-soft);border-radius:999px;background:#fff;transition:all .15s ease}
+    .back-link:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-dark);box-shadow:0 6px 14px rgba(94,124,240,.18)}
+    .legend-hint{font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <a class="back-link" href="./index.html">← 返回 Parts Clean</a>
+      <span style="display:flex;gap:10px;align-items:center">
+        <button id="load-from-excel" class="back-link" type="button" style="cursor:pointer">從 Excel 載入</button>
+        <input type="file" id="excel-input" accept=".xlsx,.xls" hidden />
+        <button id="reload" class="back-link" type="button" style="cursor:pointer">重新載入後端</button>
+        <span class="legend-hint">Y 軸上界自動加 10% 緩衝</span>
+      </span>
+    </div>
+    <div class="title">Parts Clean Trend Chart</div>
+    <div class="card">
+      <div class="filters">
+        <div>
+          <label class="field">PART 類型</label>
+          <select id="f-type">
+            <option value="" selected>所有 PART 類型</option>
+            <option value="faceplate">FACE PLATE</option>
+            <option value="blockplate">BLOCK PLATE</option>
+            <option value="processkits">PROCESS KITS</option>
+            <option value="heater">HEATER</option>
+          </select>
+        </div>
+        <div>
+          <label class="field">機型 (Group)</label>
+          <select id="f-group"><option value="">所有機型</option></select>
+        </div>
+        <div>
+          <label class="field">機台 (Tool)</label>
+          <select id="f-tool"><option value="">所有機台</option></select>
+        </div>
+        <div id="pkit-wrap" hidden>
+          <label class="field">品名 (Process Kits)</label>
+          <select id="f-pkit"><option value="">所有品名</option></select>
+        </div>
+        <div>
+          <label class="field">Parts S/N</label>
+          <select id="f-sn"><option value="">所有 S/N（依 SN 分線）</option></select>
+        </div>
+        <div>
+          <label class="field">Y 軸 (Roughness)</label>
+          <select id="f-y">
+            <option value="max">MAX</option>
+            <option value="min">MIN</option>
+            <option value="avg" selected>AVG</option>
+          </select>
+        </div>
+        <div>
+          <label class="field">X 軸</label>
+          <select id="f-x">
+            <option value="time" selected>時間 (PM 日期)</option>
+            <option value="selfWash">自洗次數</option>
+            <option value="vendorWash">廠洗次數</option>
+          </select>
+        </div>
+      </div>
+      <div class="chart-host">
+        <canvas id="chart"></canvas>
+      </div>
+      <div class="info" id="info"></div>
+      <details class="debug-box">
+        <summary>除錯資訊</summary>
+        <pre id="debug"></pre>
+      </details>
+    </div>
+  </div>
+
+  <script>
+    /* ============ 與主頁一致的資料 / 函式 ============ */
+    const PART_SUFFIXES = ['faceplate','blockplate','processkits','rps','heater'];
+    function getPartType(partsId){
+      for(const suf of PART_SUFFIXES){ if(partsId.endsWith('-' + suf)) return suf; }
+      return '';
+    }
+    function getGroupId(partsId){
+      for(const suf of PART_SUFFIXES){
+        const tail = '-' + suf;
+        if(partsId.endsWith(tail)) return partsId.slice(0, -tail.length);
+      }
+      return '';
+    }
+    const TOOL_OPTIONS = {
+      'nisacvd-sin': ['NISACVD-B01','NISACVD-B06','NISACVD-B07','NISACVD-B08'],
+      'nisacvd-usg': ['NISACVD-B03','NISACVD-B12','NISACVD-B13','NISACVD-B14'],
+      'nisacvd-4dc': ['NISACVD-B02','NISACVD-B04','NISACVD-B05','NISACVD-B09','NISACVD-B10','NISACVD-B11'],
+      'sacvd-harp':  ['SACVD-B01','SACVD-B04','SACVD-B06','SACVD-B08','SACVD-B09','SACVD-B10'],
+      'sacvd-sa':    ['SACVD-B02','SACVD-B11','SACVD-B12','SACVD-B81'],
+      'sacvd-smt':   ['SACVD-B03','SACVD-B05','SACVD-B07'],
+    };
+    const ALL_TOOLS = Object.values(TOOL_OPTIONS).flat();
+    const TOOL_TO_GROUP = (() => {
+      const m = {};
+      Object.entries(TOOL_OPTIONS).forEach(([g, ts]) => ts.forEach(t => { m[t] = g; }));
+      return m;
+    })();
+    const PKIT_ALL = ['Top liner','Middle liner','Bottom liner','Spacer'];
+    const FACEPLATE_ROUGH = {
+      'nisacvd-sin-faceplate':8,
+      'nisacvd-4dc-faceplate':8,
+      'nisacvd-usg-faceplate':13,
+      'sacvd-harp-faceplate':8,
+      'sacvd-sa-faceplate':8,
+      'sacvd-smt-faceplate':8,
+    };
+    function getMaxRoughCount(partsId){
+      const type = getPartType(partsId);
+      if(type === 'rps') return 0;
+      if(type === 'faceplate') return FACEPLATE_ROUGH[partsId] || 8;
+      if(type === 'heater') return 9;
+      if(type === 'blockplate') return 8;
+      if(type === 'processkits') return 8;
+      return 0;
+    }
+    function computeStats(values){
+      const nums = (values || []).map(v => parseFloat(v)).filter(n => !isNaN(n));
+      if(nums.length === 0) return null;
+      const max = Math.max(...nums), min = Math.min(...nums);
+      const avg = nums.reduce((a,b)=>a+b,0)/nums.length;
+      return { max, min, avg };
+    }
+    function pickRough(row, partsId){
+      const n = getMaxRoughCount(partsId);
+      const vals = [];
+      for(let i=1;i<=n;i++){
+        const v = row['rough'+i];
+        if(v !== undefined && v !== null && v !== '') vals.push(v);
+      }
+      return computeStats(vals);
+    }
+    /* parseDate：支援 'YYYY/MM/DD'、'YYYY-MM-DD'、ISO 字串、Date 物件、Excel 序號 */
+    function parseDate(s){
+      if(s == null || s === '') return null;
+      if(s instanceof Date) return isNaN(s) ? null : s;
+      if(typeof s === 'number'){
+        // Excel 日期序號（1899/12/30 起算）
+        if(s > 20000 && s < 80000){
+          const ms = (s - 25569) * 86400 * 1000;
+          const d = new Date(ms);
+          return isNaN(d) ? null : d;
+        }
+        const d = new Date(s);
+        return isNaN(d) ? null : d;
+      }
+      const t = String(s).trim();
+      if(!t) return null;
+      const m = t.replace(/-/g,'/').match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+      if(m){
+        const d = new Date(+m[1], +m[2]-1, +m[3]);
+        if(!isNaN(d)) return d;
+      }
+      const d = new Date(t);
+      return isNaN(d) ? null : d;
+    }
+    function formatDate(ts){
+      const d = new Date(ts);
+      return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+    }
+
+    /* ============ 從後端拉所有資料 ============ */
+    const IS_FILE = location.protocol === 'file:';
+    // 用 new URL 解析成絕對位址，避免相對路徑在不同部署下歧義
+    const API_BASE = new URL('./PartsCleanApi/parts-clean-handler.ashx', location.href).toString();
+
+    /* ============ 「從 Excel 載入」用的欄位定義（與 parts-clean.html 一致） ============ */
+    function _ymd2(d){ return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`; }
+    const DATE_KEYS = new Set(['pmDate','date','onDate','offDate']);
+    function normalizeCell(v, key){
+      if(v == null) return '';
+      if(DATE_KEYS.has(key)){
+        if(v instanceof Date) return isNaN(v) ? '' : _ymd2(v);
+        if(typeof v === 'number' && v > 20000 && v < 80000){
+          const d = new Date((v - 25569) * 86400 * 1000);
+          if(!isNaN(d)) return _ymd2(d);
+        }
+      }
+      return String(v).trim();
+    }
+    function getColumnsForType(type){
+      if(type === 'rps'){
+        return [
+          {key:'tool',label:'Tool'},{key:'chamber',label:'Chamber'},{key:'side',label:'Side'},
+          {key:'date',label:'Date'},{key:'category',label:'Category'},{key:'sn',label:'SN'},
+          {key:'hours',label:'時數'},{key:'purgerCount',label:'Purger次數<50ea'},
+          {key:'cleanBeforeIn',label:'Clean前(in端)PA'},{key:'cleanBeforeOut',label:'Clean前(out端)PA'},
+          {key:'cleanAfterIn1',label:'Clean後(in) 1st'},{key:'cleanAfterIn2',label:'Clean後(in) 2nd'},{key:'cleanAfterIn3',label:'Clean後(in) 3rd'},
+          {key:'cleanAfterOut1',label:'Clean後(out) 1st'},{key:'cleanAfterOut2',label:'Clean後(out) 2nd'},{key:'cleanAfterOut3',label:'Clean後(out) 3rd'},
+          {key:'pa5',label:'PA5顆數每次'},{key:'pmStaff',label:'PM人員'},{key:'vendor',label:'維修商'},{key:'note',label:'備註'},
+        ];
+      }
+      const cols = [
+        {key:'tool',label:'Tool'},{key:'chamber',label:'Chamber'},{key:'side',label:'Side'},{key:'pmDate',label:'PM日期'},
+      ];
+      if(type === 'processkits') cols.push({key:'pkitName',label:'品名'});
+      cols.push({key:'sn',label:'Parts S/N'},{key:'onDate',label:'上機日期'},{key:'offDate',label:'下機日期'},{key:'offReason',label:'下機原因'});
+      if(type === 'faceplate' || type === 'blockplate' || type === 'processkits'){
+        cols.push({key:'cleanType',label:'清洗方式'},{key:'selfWash',label:'自洗次數'},{key:'vendorWash',label:'廠洗次數'});
+      }
+      const maxR = type === 'faceplate' ? 13 : type === 'heater' ? 9 : 8;
+      for(let i=1;i<=maxR;i++) cols.push({key:'rough'+i,label:'R'+i});
+      if(type !== 'heater'){
+        for(let i=1;i<=4;i++) cols.push({key:'particle'+i,label:'P'+i});
+      }
+      cols.push({key:'note',label:'備註'});
+      return cols;
+    }
+    const SHEET_TO_TYPE = {
+      'FACE PLATE':'faceplate','BLOCK PLATE':'blockplate',
+      'PROCESS KITS':'processkits','RPS':'rps','HEATER':'heater',
+    };
+    async function loadFromExcel(file){
+      if(typeof XLSX === 'undefined'){ alert('Excel 解析模組尚未載入，請檢查網路'); return; }
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array', cellDates:true});
+      // 清空現有 allData / 錯誤
+      Object.keys(allData).forEach(k => delete allData[k]);
+      Object.keys(loadErrors).forEach(k => delete loadErrors[k]);
+      let total = 0;
+      const noTool = [], unknownTool = [];
+      for(const sheetName of wb.SheetNames){
+        const type = SHEET_TO_TYPE[(sheetName || '').trim().toUpperCase()];
+        if(!type) continue;
+        const grid = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], {header:1, defval:''});
+        if(grid.length < 2) continue;
+        const headers = grid[0].map(h => String(h ?? '').trim());
+        const cols = getColumnsForType(type);
+        const keyByIdx = headers.map(h => (cols.find(c => c.label === h) || {}).key || null);
+        if(keyByIdx.filter(Boolean).length === 0) continue;
+        for(let i=1;i<grid.length;i++){
+          const r = grid[i];
+          if(!r || r.every(v => v == null || String(v).trim() === '')) continue;
+          const obj = {};
+          for(let j=0;j<keyByIdx.length;j++){
+            const k = keyByIdx[j];
+            if(k) obj[k] = normalizeCell(r[j], k);
+          }
+          if(!obj.tool){ noTool.push(i+1); continue; }
+          const group = TOOL_TO_GROUP[obj.tool];
+          if(!group){ unknownTool.push(obj.tool); continue; }
+          const partsId = `${group}-${type}`;
+          if(!allData[partsId]) allData[partsId] = [];
+          allData[partsId].push(obj);
+          total++;
+        }
+      }
+      alert(`已從 Excel 載入 ${total} 筆${noTool.length?`（跳過 ${noTool.length} 列無 Tool）`:''}${unknownTool.length?`（跳過 ${unknownTool.length} 列 Tool 不在清單）`:''}`);
+    }
+    async function apiLoadRows(partsId){
+      const url = `${API_BASE}?mode=load&partsId=${encodeURIComponent(partsId)}`;
+      try{
+        const r = await fetch(url, {cache:'no-store'});
+        if(!r.ok) throw new Error(`HTTP ${r.status}`);
+        const d = await r.json();
+        if(!d?.success) throw new Error(d?.error || 'success=false');
+        return Array.isArray(d.rows) ? d.rows : [];
+      }catch(e){
+        throw new Error(e?.message || String(e));
+      }
+    }
+    const PART_TYPES = ['faceplate','blockplate','processkits','rps','heater'];
+    const GROUPS = Object.keys(TOOL_OPTIONS);
+    const ALL_PARTS_IDS = [];
+    GROUPS.forEach(g => PART_TYPES.forEach(t => ALL_PARTS_IDS.push(`${g}-${t}`)));
+
+    /* 載入完成後初始化 */
+    const allData = {};
+    const loadErrors = {};
+    async function loadAll(){
+      if(IS_FILE){
+        // file:// 模式：fetch 一定會失敗，直接略過，請使用者改用「從 Excel 載入」
+        loadErrors['(file://)'] = '頁面以 file:// 開啟，瀏覽器禁止 fetch；請改用「從 Excel 載入」或部署到 IIS / HTTP';
+        return;
+      }
+      await Promise.all(ALL_PARTS_IDS.map(async id => {
+        try{
+          allData[id] = await apiLoadRows(id);
+        }catch(err){
+          allData[id] = [];
+          loadErrors[id] = String(err?.message || err);
+        }
+      }));
+      const total = Object.values(allData).reduce((a,r) => a + (r?.length||0), 0);
+      console.log('[trend] 載入完成，共', total, '筆。詳細：', allData);
+      if(Object.keys(loadErrors).length) console.warn('[trend] 載入錯誤：', loadErrors);
+    }
+
+    /* ============ 篩選器 / 圖表 ============ */
+    const els = {
+      type: document.getElementById('f-type'),
+      group:document.getElementById('f-group'),
+      tool: document.getElementById('f-tool'),
+      pkit: document.getElementById('f-pkit'),
+      pkitWrap: document.getElementById('pkit-wrap'),
+      sn:   document.getElementById('f-sn'),
+      yAxis:document.getElementById('f-y'),
+      xAxis:document.getElementById('f-x'),
+      info: document.getElementById('info'),
+      canvas: document.getElementById('chart'),
+    };
+    let chart = null;
+    const debugEl = document.getElementById('debug');
+    function writeDebug(lines){
+      const txt = Array.isArray(lines) ? lines.join('\n') : String(lines);
+      debugEl.textContent = txt;
+      console.log('[trend]', txt);
+    }
+
+    function fillGroupSelect(){
+      els.group.innerHTML = '<option value="">所有機型</option>' +
+        GROUPS.map(g => `<option value="${g}">${GROUP_LABEL[g] || g.toUpperCase()}</option>`).join('');
+    }
+    function fillToolSelect(){
+      const g = els.group.value;
+      const groupsToShow = g ? [g] : GROUPS;
+      const keep = els.tool.value;
+      els.tool.innerHTML = '<option value="">所有機台</option>' +
+        groupsToShow.map(gid => `<optgroup label="${GROUP_LABEL[gid] || gid.toUpperCase()}">` +
+          TOOL_OPTIONS[gid].map(t => `<option value="${t}">${t}</option>`).join('') +
+          '</optgroup>'
+        ).join('');
+      // 機型切換後若舊機台不在新範圍內，重置；否則保留
+      if(keep && (!g || TOOL_OPTIONS[g]?.includes(keep))){
+        els.tool.value = keep;
+      }else{
+        els.tool.value = '';
+      }
+    }
+    function fillPkitSelect(){
+      els.pkit.innerHTML = '<option value="">所有品名</option>' +
+        PKIT_ALL.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
+
+    /* 把目前篩選下「可選」的 S/N 列出 */
+    function refreshSnOptions(){
+      const type = els.type.value;
+      const group= els.group.value;
+      const tool = els.tool.value;
+      const pkit = (type === 'processkits') ? els.pkit.value : '';
+      const sns = new Set();
+      collectFilteredRows({type, group, tool, pkit, sn:''}).forEach(({row}) => {
+        if(row.sn) sns.add(row.sn);
+      });
+      const keep = els.sn.value;
+      els.sn.innerHTML = '<option value="">所有 S/N（依 SN 分線）</option>' +
+        Array.from(sns).sort().map(s => `<option value="${s}">${s}</option>`).join('');
+      if(keep && sns.has(keep)) els.sn.value = keep;
+    }
+
+    /* 收集符合條件的 row。各篩選留白 = 所有；type 留白 = 所有有 Roughness 的類型（排除 RPS）。 */
+    function collectFilteredRows({type, group, tool, pkit, sn}){
+      const result = []; // [{partsId, row}]
+      ALL_PARTS_IDS.forEach(id => {
+        const t = getPartType(id);
+        if(t === 'rps') return;            // RPS 無 Roughness，不納入趨勢
+        if(type && t !== type) return;
+        const idGroup = getGroupId(id);
+        if(group && idGroup !== group) return;
+        if(tool){
+          const g = TOOL_TO_GROUP[tool];
+          if(!g || `${g}-${t}` !== id) return;
+        }
+        (allData[id] || []).forEach(row => {
+          if(tool && row.tool !== tool) return;
+          if(pkit && row.pkitName !== pkit) return;
+          if(sn && row.sn !== sn) return;
+          result.push({partsId:id, row});
+        });
+      });
+      return result;
+    }
+    const PART_TYPE_LABEL = {
+      faceplate:'FACE PLATE', blockplate:'BLOCK PLATE',
+      processkits:'PROCESS KITS', heater:'HEATER',
+    };
+    const GROUP_LABEL = {
+      'nisacvd-sin':'NISACVD_SIN','nisacvd-4dc':'NISACVD_4DC','nisacvd-usg':'NISACVD_USG',
+      'sacvd-harp':'SACVD_HARP','sacvd-sa':'SACVD_SA','sacvd-smt':'SACVD_SMT',
+    };
+
+    /* 取 X 軸值 */
+    function xValue(row, mode){
+      if(mode === 'time'){
+        const d = parseDate(row.pmDate || row.date);
+        return d ? d.getTime() : null;
+      }
+      const v = parseFloat(row[mode]);
+      return isNaN(v) ? null : v;
+    }
+
+    const COLORS = [
+      'rgba(40,90,200,1)',    // 深藍
+      'rgba(105,55,220,1)',   // 深紫
+      'rgba(6,150,100,1)',    // 深翠綠
+      'rgba(210,60,80,1)',    // 深紅
+      'rgba(210,130,8,1)',    // 深橙
+      'rgba(8,150,135,1)',    // 深青綠
+      'rgba(200,40,120,1)',   // 深粉紅
+      'rgba(30,95,210,1)',    // 深寶藍
+      'rgba(135,60,215,1)',   // 深葡萄紫
+    ];
+    const FILL_COLORS = COLORS.map(c => c.replace(',1)',',0.18)'));
+
+    function refreshChart(){
+      const type = els.type.value;
+      const group= els.group.value;
+      const tool = els.tool.value;
+      const pkit = (type === 'processkits') ? els.pkit.value : '';
+      const sn   = els.sn.value;
+      const yKey = els.yAxis.value;     // 'max'/'min'/'avg'
+      const xMode= els.xAxis.value;     // 'time' / 'selfWash' / 'vendorWash'
+
+      const filtered = collectFilteredRows({type, group, tool, pkit, sn});
+
+      // 除錯計數
+      let dbgWithRough = 0, dbgWithX = 0, dbgWithoutSn = 0;
+      const dbgSample = [];
+
+      // 分線：未選 PART 類型時，把類型加進 label 以區分不同 PART 的 SN
+      const bySn = {};
+      filtered.forEach(({partsId, row}) => {
+        const pt = getPartType(partsId);
+        const snStr = row.sn || '(無 SN)';
+        if(!row.sn) dbgWithoutSn++;
+        const k = type
+          ? snStr
+          : `[${PART_TYPE_LABEL[pt] || pt}] ${snStr}`;
+        if(!bySn[k]) bySn[k] = [];
+        const stats = pickRough(row, partsId);
+        if(stats) dbgWithRough++;
+        const x = xValue(row, xMode);
+        if(x !== null) dbgWithX++;
+        if(dbgSample.length < 3){
+          dbgSample.push({
+            partsId, sn:row.sn, tool:row.tool, chamber:row.chamber, side:row.side,
+            pmDate:row.pmDate, date:row.date, selfWash:row.selfWash, vendorWash:row.vendorWash,
+            roughSample:[row.rough1, row.rough2, row.rough3].filter(v => v != null && v !== ''),
+            statsOk: !!stats, xOk: x !== null,
+          });
+        }
+        if(!stats || x === null) return;
+        bySn[k].push({ x, y: stats[yKey], row, partsId });
+      });
+
+      // 除錯訊息：每次重畫都更新
+      const totalLoaded = Object.values(allData).reduce((a,r) => a + (r?.length||0), 0);
+      const perPartsId = ALL_PARTS_IDS.map(id => `  ${id}: ${(allData[id]||[]).length}`).filter(s => !s.endsWith(': 0')).join('\n');
+      const errCount = Object.keys(loadErrors).length;
+      const fetchFailed = Object.values(loadErrors).some(e => /Failed to fetch|NetworkError/i.test(String(e)));
+      writeDebug([
+        `頁面 URL：${location.href}`,
+        `API URL ：${API_BASE}`,
+        `Y 軸: ${yKey.toUpperCase()}  X 軸: ${xMode}`,
+        `篩選: type=${type||'(所有)'} group=${group||'(所有)'} tool=${tool||'(所有)'} pkit=${pkit||'(所有)'} sn=${sn||'(所有)'}`,
+        `後端載入共 ${totalLoaded} 筆，非空 partsId：`,
+        perPartsId || '  (全部為空)',
+        ``,
+        `符合篩選 ${filtered.length} 筆  |  有 Roughness 值 ${dbgWithRough} 筆  |  X 軸 (${xMode}) 有效 ${dbgWithX} 筆  |  無 SN ${dbgWithoutSn} 筆`,
+        errCount ? `\n載入錯誤 ${errCount} 個：\n` + Object.entries(loadErrors).slice(0,6).map(([id,e]) => `  ${id} → ${e}`).join('\n') + (errCount>6?`\n  …另外 ${errCount-6} 個`:'') : '',
+        IS_FILE ? '\n※ 目前是 file:// 模式：瀏覽器禁止 fetch 後端。請點上方「從 Excel 載入」選擇主頁匯出的 PartsClean_export_*.xlsx；或部署到 IIS / HTTP 開啟。' :
+        fetchFailed ? '\n※ 出現「Failed to fetch」常見原因：\n  1) PartsCleanApi 資料夾或 parts-clean-handler.ashx 沒部署到 trend.html 同一個站點底下\n  2) 站點被 HTTPS 與 HTTP 混合擋下\n  → 直接把 API URL 貼到瀏覽器網址列開看看，如果連那個都不行就是路徑 / 部署問題' : '',
+        dbgSample.length ? '\n抽樣 ' + dbgSample.length + ' 筆：\n' + JSON.stringify(dbgSample, null, 2) : '',
+      ].filter(Boolean));
+
+      const datasets = Object.entries(bySn)
+        .map(([sn, points], idx) => {
+          points.sort((a,b) => a.x - b.x);
+          const color = COLORS[idx % COLORS.length];
+          const fill  = FILL_COLORS[idx % FILL_COLORS.length];
+          return {
+            label: sn,
+            data: points.map(p => ({x:p.x, y:p.y})),
+            borderColor: color,
+            backgroundColor: fill,
+            borderWidth: 2.5,
+            pointRadius: 6,
+            pointHoverRadius: 9,
+            pointBorderWidth: 2,
+            pointBackgroundColor: color,
+            pointBorderColor: '#ffffff',
+            pointHoverBorderWidth: 2.5,
+            tension: 0.15,
+            spanGaps: true,
+            fill: false,
+          };
+        })
+        .filter(d => d.data.length > 0);
+
+      const allY = datasets.flatMap(d => d.data.map(p => p.y)).filter(v => typeof v === 'number' && !isNaN(v));
+      const maxY = allY.length ? Math.max(...allY) : 0;
+      const yMax = maxY > 0 ? maxY * 1.1 : 1;
+
+      const xTitle = xMode === 'time' ? '時間'
+                   : xMode === 'selfWash' ? '自洗次數' : '廠洗次數';
+      const yTitle = `Roughness ${yKey.toUpperCase()}`;
+
+      if(chart){ chart.destroy(); chart = null; }
+
+      if(datasets.length === 0){
+        els.canvas.getContext('2d').clearRect(0,0,els.canvas.width,els.canvas.height);
+        // 細部診斷：看看篩選後在哪一步被刷掉
+        const loaded = Object.values(allData).reduce((a,r) => a + (r?.length||0), 0);
+        const totalFiltered = filtered.length;
+        let withRough = 0, withX = 0, withSn = 0;
+        filtered.forEach(({row, partsId}) => {
+          if(pickRough(row, partsId)) withRough++;
+          if(xValue(row, xMode) !== null) withX++;
+          if(row.sn) withSn++;
+        });
+        const xLabel = xMode === 'time' ? 'PM 日期 (時間軸)' : (xMode==='selfWash'?'自洗次數':'廠洗次數');
+        els.info.innerHTML = '<b>沒有可繪製的資料</b><br/>'
+          + `後端載入：<b>${loaded}</b> 筆　|　符合篩選：<b>${totalFiltered}</b> 筆<br/>`
+          + `其中有 Roughness 值：<b>${withRough}</b> 筆　|　有效 X 軸 (<b>${xLabel}</b>)：<b>${withX}</b> 筆　|　有 SN：<b>${withSn}</b> 筆<br/>`
+          + (loaded === 0 ? '※ 後端載入為 0，可能是 ./PartsCleanApi/parts-clean-handler.ashx 路徑或權限問題' :
+             withRough === 0 ? '※ 沒有任何紀錄填了 R1..Rn 量測點' :
+             withX === 0 && xMode==='time' ? '※ PM 日期格式無法解析（試試另存或重新填寫日期欄位）' :
+             withX === 0 ? `※ 所有紀錄的 ${xLabel} 都是空的 (試試把 X 軸切到「時間」)` :
+             '※ 請放寬篩選條件');
+        return;
+      }
+
+      chart = new Chart(els.canvas.getContext('2d'), {
+        type: 'line',
+        data: { datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode:'nearest', intersect:false },
+          plugins: {
+            legend: { labels:{ color:'#3b4a6b', font:{ weight:'600' } } },
+            tooltip: {
+              callbacks: {
+                title: items => {
+                  if(!items.length) return '';
+                  const x = items[0].parsed.x;
+                  return xMode === 'time' ? formatDate(x) : `${xTitle}: ${x}`;
+                },
+                label: it => `${it.dataset.label}: ${it.parsed.y?.toFixed?.(3) ?? it.parsed.y}`,
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: 'linear',
+              title: { display:true, text:xTitle, color:'#0f1a36', font:{ weight:'800', size:14 } },
+              ticks: {
+                color:'#1f2a44',
+                font:{ weight:'700' },
+                callback: v => xMode === 'time' ? formatDate(v) : v,
+              },
+              grid: { color:'rgba(60,90,170,.18)' },
+              border: { color:'#3b4a6b', width:1.5 },
+            },
+            y: {
+              min: 0,
+              max: yMax,
+              title: { display:true, text:yTitle, color:'#0f1a36', font:{ weight:'800', size:14 } },
+              ticks: { color:'#1f2a44', font:{ weight:'700' } },
+              grid: { color:'rgba(60,90,170,.18)' },
+              border: { color:'#3b4a6b', width:1.5 },
+            }
+          }
+        }
+      });
+
+      const totalPoints = datasets.reduce((a,d) => a + d.data.length, 0);
+      els.info.innerHTML =
+        `共 <b>${datasets.length}</b> 條線（依 S/N）／ <b>${totalPoints}</b> 個資料點　|　` +
+        `Y: <b>${yTitle}</b>　X: <b>${xTitle}</b>　|　Y 軸上界：<b>${yMax.toFixed(3)}</b>（最大值 ${maxY.toFixed(3)} × 1.1）`;
+    }
+
+    /* ============ 初始化 ============ */
+    function syncPkitVisibility(){
+      els.pkitWrap.hidden = (els.type.value !== 'processkits');
+    }
+
+    function whenChartJsReady(){
+      return new Promise(resolve => {
+        if(typeof Chart !== 'undefined') return resolve();
+        const t = setInterval(() => {
+          if(typeof Chart !== 'undefined'){ clearInterval(t); resolve(); }
+        }, 50);
+      });
+    }
+
+    (async () => {
+      fillGroupSelect();
+      fillToolSelect();
+      fillPkitSelect();
+      els.info.textContent = '正在載入資料…';
+      await loadAll();
+      await whenChartJsReady();
+      syncPkitVisibility();
+      refreshSnOptions();
+      refreshChart();
+
+      [els.type, els.group, els.tool, els.pkit, els.sn, els.yAxis, els.xAxis].forEach(el => {
+        el.addEventListener('change', () => {
+          if(el === els.type){ syncPkitVisibility(); refreshSnOptions(); }
+          if(el === els.group){ fillToolSelect(); refreshSnOptions(); }
+          if(el === els.tool || el === els.pkit){ refreshSnOptions(); }
+          refreshChart();
+        });
+      });
+
+      document.getElementById('reload')?.addEventListener('click', async () => {
+        Object.keys(allData).forEach(k => delete allData[k]);
+        Object.keys(loadErrors).forEach(k => delete loadErrors[k]);
+        els.info.textContent = '正在重新載入…';
+        await loadAll();
+        refreshSnOptions();
+        refreshChart();
+      });
+      document.getElementById('load-from-excel')?.addEventListener('click', () => {
+        document.getElementById('excel-input').click();
+      });
+      document.getElementById('excel-input')?.addEventListener('change', async ev => {
+        const file = ev.target.files?.[0];
+        ev.target.value = '';
+        if(!file) return;
+        try{
+          await loadFromExcel(file);
+          refreshSnOptions();
+          refreshChart();
+        }catch(err){
+          console.error(err);
+          alert('Excel 載入失敗：' + (err?.message || err));
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
