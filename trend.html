@@ -73,6 +73,12 @@
     select option,select optgroup{background-color:#fff;color:var(--text)}
     select option:checked{background:var(--accent-soft);color:var(--accent-dark)}
     select:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(94,124,240,.18)}
+    /* multi-select 樣式：白底、每 option 帶 padding、選中變藍紫 */
+    select[multiple]{padding:4px;height:auto;min-height:110px;max-height:160px;overflow-y:auto}
+    select[multiple] option{padding:5px 8px;border-radius:5px;margin:1px 0;cursor:pointer}
+    select[multiple] option:checked{background:linear-gradient(135deg,var(--accent-soft),rgba(139,92,246,.18));color:var(--accent-dark);font-weight:700}
+    select[multiple] option:hover{background:#f4f7ff}
+    .multi-hint{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:0}
     .chart-host{position:relative;background:linear-gradient(180deg,#fbfcff 0%,#f5f8fe 100%);border:1px solid var(--border-soft);border-radius:12px;padding:14px;min-height:460px;box-shadow:inset 0 0 0 1px rgba(94,124,240,.04)}
     canvas{width:100% !important;max-height:520px}
     .info{margin-top:10px;color:var(--muted);font-size:12px}
@@ -109,9 +115,8 @@
     <div class="card">
       <div class="filters">
         <div>
-          <label class="field">PART 類型</label>
-          <select id="f-type">
-            <option value="" selected>所有 PART 類型</option>
+          <label class="field">PART 類型 <span class="multi-hint">(可複選 · 未選=全部)</span></label>
+          <select id="f-type" multiple size="4">
             <option value="faceplate">FACE PLATE</option>
             <option value="blockplate">BLOCK PLATE</option>
             <option value="processkits">PROCESS KITS</option>
@@ -119,20 +124,20 @@
           </select>
         </div>
         <div>
-          <label class="field">機型 (Group)</label>
-          <select id="f-group"><option value="">所有機型</option></select>
+          <label class="field">機型 (Group) <span class="multi-hint">(可複選)</span></label>
+          <select id="f-group" multiple size="4"></select>
         </div>
         <div>
-          <label class="field">機台 (Tool)</label>
-          <select id="f-tool"><option value="">所有機台</option></select>
+          <label class="field">機台 (Tool) <span class="multi-hint">(可複選)</span></label>
+          <select id="f-tool" multiple size="4"></select>
         </div>
         <div id="pkit-wrap" hidden>
-          <label class="field">品名 (Process Kits)</label>
-          <select id="f-pkit"><option value="">所有品名</option></select>
+          <label class="field">品名 (Process Kits) <span class="multi-hint">(可複選)</span></label>
+          <select id="f-pkit" multiple size="4"></select>
         </div>
         <div>
-          <label class="field">Parts S/N</label>
-          <select id="f-sn"><option value="">所有 S/N（依 SN 分線）</option></select>
+          <label class="field">Parts S/N <span class="multi-hint">(可複選 · 依 SN 分線)</span></label>
+          <select id="f-sn" multiple size="4"></select>
         </div>
         <div>
           <label class="field">Y 軸 (Roughness)</label>
@@ -395,6 +400,7 @@
       canvas: document.getElementById('chart'),
     };
     let chart = null;
+    let showDelta = !!(els.showDelta && els.showDelta.checked);
     const debugEl = document.getElementById('debug');
     function writeDebug(lines){
       const txt = Array.isArray(lines) ? lines.join('\n') : String(lines);
@@ -402,64 +408,67 @@
       console.log('[trend]', txt);
     }
 
+    /* 讀多選 select 為字串陣列；未選任何 = 空陣列 = 「全部」語意 */
+    function readMulti(el){
+      if(!el) return [];
+      return Array.from(el.selectedOptions).map(o => o.value).filter(v => v !== '');
+    }
+    /* 產生 option HTML，保留已選狀態 */
+    function optionHtml(value, label, keep){
+      const sel = keep.includes(value) ? ' selected' : '';
+      return `<option value="${escapeAttr(value)}"${sel}>${escapeText(label)}</option>`;
+    }
+    function escapeAttr(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function escapeText(s){ return String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
     function fillGroupSelect(){
-      els.group.innerHTML = '<option value="">所有機型</option>' +
-        GROUPS.map(g => `<option value="${g}">${GROUP_LABEL[g] || g.toUpperCase()}</option>`).join('');
+      const keep = readMulti(els.group);
+      els.group.innerHTML = GROUPS.map(g => optionHtml(g, GROUP_LABEL[g] || g.toUpperCase(), keep)).join('');
     }
     function fillToolSelect(){
-      const g = els.group.value;
-      const groupsToShow = g ? [g] : GROUPS;
-      const keep = els.tool.value;
-      els.tool.innerHTML = '<option value="">所有機台</option>' +
-        groupsToShow.map(gid => `<optgroup label="${GROUP_LABEL[gid] || gid.toUpperCase()}">` +
-          TOOL_OPTIONS[gid].map(t => `<option value="${t}">${t}</option>`).join('') +
-          '</optgroup>'
-        ).join('');
-      // 機型切換後若舊機台不在新範圍內，重置；否則保留
-      if(keep && (!g || TOOL_OPTIONS[g]?.includes(keep))){
-        els.tool.value = keep;
-      }else{
-        els.tool.value = '';
-      }
+      const groups = readMulti(els.group);
+      const groupsToShow = groups.length ? groups : GROUPS;
+      const keep = readMulti(els.tool);
+      els.tool.innerHTML = groupsToShow.map(gid =>
+        `<optgroup label="${escapeAttr(GROUP_LABEL[gid] || gid.toUpperCase())}">` +
+          TOOL_OPTIONS[gid].map(t => optionHtml(t, t, keep)).join('') +
+        '</optgroup>'
+      ).join('');
     }
     function fillPkitSelect(){
-      els.pkit.innerHTML = '<option value="">所有品名</option>' +
-        PKIT_ALL.map(p => `<option value="${p}">${p}</option>`).join('');
+      const keep = readMulti(els.pkit);
+      els.pkit.innerHTML = PKIT_ALL.map(p => optionHtml(p, p, keep)).join('');
     }
 
-    /* 把目前篩選下「可選」的 S/N 列出 */
+    /* 把目前篩選下「可選」的 S/N 列出，保留已選中且仍存在的 SN */
     function refreshSnOptions(){
-      const type = els.type.value;
-      const group= els.group.value;
-      const tool = els.tool.value;
-      const pkit = (type === 'processkits') ? els.pkit.value : '';
+      const types = readMulti(els.type);
+      const groups= readMulti(els.group);
+      const tools = readMulti(els.tool);
+      const pkits = types.includes('processkits') ? readMulti(els.pkit) : [];
       const sns = new Set();
-      collectFilteredRows({type, group, tool, pkit, sn:''}).forEach(({row}) => {
+      collectFilteredRows({types, groups, tools, pkits, sns:[]}).forEach(({row}) => {
         if(row.sn) sns.add(row.sn);
       });
-      const keep = els.sn.value;
-      els.sn.innerHTML = '<option value="">所有 S/N（依 SN 分線）</option>' +
-        Array.from(sns).sort().map(s => `<option value="${s}">${s}</option>`).join('');
-      if(keep && sns.has(keep)) els.sn.value = keep;
+      const keep = readMulti(els.sn);
+      els.sn.innerHTML = Array.from(sns).sort()
+        .map(s => optionHtml(s, s, keep)).join('');
     }
 
-    /* 收集符合條件的 row。各篩選留白 = 所有；type 留白 = 所有有 Roughness 的類型（排除 RPS）。 */
-    function collectFilteredRows({type, group, tool, pkit, sn}){
-      const result = []; // [{partsId, row}]
+    /* 收集符合條件的 row；每個篩選傳陣列，空陣列 = 「全部」 */
+    function collectFilteredRows({types, groups, tools, pkits, sns}){
+      const inArr = (arr, v) => !arr || arr.length === 0 || arr.includes(v);
+      const result = [];
       ALL_PARTS_IDS.forEach(id => {
         const t = getPartType(id);
-        if(t === 'rps') return;            // RPS 無 Roughness，不納入趨勢
-        if(type && t !== type) return;
+        if(t === 'rps') return;                    // RPS 無 Roughness
+        if(!inArr(types, t)) return;
         const idGroup = getGroupId(id);
-        if(group && idGroup !== group) return;
-        if(tool){
-          const g = TOOL_TO_GROUP[tool];
-          if(!g || `${g}-${t}` !== id) return;
-        }
+        if(!inArr(groups, idGroup)) return;
         (allData[id] || []).forEach(row => {
-          if(tool && row.tool !== tool) return;
-          if(pkit && row.pkitName !== pkit) return;
-          if(sn && row.sn !== sn) return;
+          if(!inArr(tools, row.tool)) return;
+          if(!inArr(pkits, row.pkitName || '')) return;   // 非 processkits 的 row.pkitName 是 undefined
+          if(!inArr(sns, row.sn)) return;
           result.push({partsId:id, row});
         });
       });
@@ -508,27 +517,28 @@
           '解法二：把 <a href="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" target="_blank">chart.umd.min.js</a> 與 <a href="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" target="_blank">xlsx.full.min.js</a> 下載後放到 <code>./libs/</code> 資料夾（跟 trend.html 同層）。';
         return;
       }
-      const type = els.type.value;
-      const group= els.group.value;
-      const tool = els.tool.value;
-      const pkit = (type === 'processkits') ? els.pkit.value : '';
-      const sn   = els.sn.value;
-      const yKey = els.yAxis.value;     // 'max'/'min'/'avg'
-      const xMode= els.xAxis.value;     // 'time' / 'selfWash' / 'vendorWash'
+      const types  = readMulti(els.type);
+      const groups = readMulti(els.group);
+      const tools  = readMulti(els.tool);
+      const pkits  = types.includes('processkits') || types.length === 0 ? readMulti(els.pkit) : [];
+      const sns    = readMulti(els.sn);
+      const yKey   = els.yAxis.value;     // 'max'/'min'/'avg'
+      const xMode  = els.xAxis.value;     // 'time' / 'selfWash' / 'vendorWash'
 
-      const filtered = collectFilteredRows({type, group, tool, pkit, sn});
+      const filtered = collectFilteredRows({types, groups, tools, pkits, sns});
+      const singleType = types.length === 1 ? types[0] : null;
 
       // 除錯計數
       let dbgWithRough = 0, dbgWithX = 0, dbgWithoutSn = 0;
       const dbgSample = [];
 
-      // 分線：未選 PART 類型時，把類型加進 label 以區分不同 PART 的 SN
+      // 分線：選了單一 PART 類型時，label 直接用 SN；否則加類型前綴以避免不同類型的同 SN 撞線
       const bySn = {};
       filtered.forEach(({partsId, row}) => {
         const pt = getPartType(partsId);
         const snStr = row.sn || '(無 SN)';
         if(!row.sn) dbgWithoutSn++;
-        const k = type
+        const k = singleType
           ? snStr
           : `[${PART_TYPE_LABEL[pt] || pt}] ${snStr}`;
         if(!bySn[k]) bySn[k] = [];
@@ -557,7 +567,7 @@
         `頁面 URL：${location.href}`,
         `API URL ：${API_BASE}`,
         `Y 軸: ${yKey.toUpperCase()}  X 軸: ${xMode}`,
-        `篩選: type=${type||'(所有)'} group=${group||'(所有)'} tool=${tool||'(所有)'} pkit=${pkit||'(所有)'} sn=${sn||'(所有)'}`,
+        `篩選: type=[${types.join(',')||'所有'}] group=[${groups.join(',')||'所有'}] tool=[${tools.join(',')||'所有'}] pkit=[${pkits.join(',')||'所有'}] sn=[${sns.join(',')||'所有'}]`,
         `後端載入共 ${totalLoaded} 筆，非空 partsId：`,
         perPartsId || '  (全部為空)',
         ``,
@@ -625,17 +635,16 @@
         return;
       }
 
-      // Δ 值繪製 plugin：在相鄰兩點連線的中點畫出 y 值差
-      const showDelta = !!els.showDelta?.checked;
+      // Δ 值繪製 plugin：讀取外層 showDelta 變數，避免每次 refreshChart 才能更新
       const deltaLabelsPlugin = {
         id: 'deltaLabels',
         afterDatasetsDraw(c){
           if(!showDelta) return;
           const cctx = c.ctx;
           cctx.save();
-          cctx.font = 'bold 10.5px system-ui, sans-serif';
+          cctx.font = 'bold 13px system-ui, sans-serif';
           cctx.textAlign = 'center';
-          cctx.textBaseline = 'bottom';
+          cctx.textBaseline = 'middle';
           c.data.datasets.forEach((ds, di) => {
             const meta = c.getDatasetMeta(di);
             if(!meta || meta.hidden) return;
@@ -647,16 +656,42 @@
               if(!Number.isFinite(y0) || !Number.isFinite(y1)) continue;
               const delta = y1 - y0;
               const midX = (p0.x + p1.x) / 2;
-              const midY = (p0.y + p1.y) / 2 - 6;
+              // 位置：連線中點往上偏 16px 避開折線
+              const midY = (p0.y + p1.y) / 2 - 16;
               const label = (delta >= 0 ? '+' : '') + delta.toFixed(2);
-              // 白色描邊讓字在任何顏色線上都清楚
-              cctx.lineWidth = 3.5;
-              cctx.strokeStyle = 'rgba(255,255,255,.95)';
-              cctx.strokeText(label, midX, midY);
-              cctx.fillStyle = delta > 0 ? '#c62828'
-                             : delta < 0 ? '#2e7d32'
-                             : '#374151';
-              cctx.fillText(label, midX, midY);
+              const color = delta > 0 ? '#c62828'
+                          : delta < 0 ? '#2e7d32'
+                          : '#374151';
+              // 白底圓角矩形 + 邊框：完全遮住底下的折線，Δ 值不會與線條混亂
+              const metrics = cctx.measureText(label);
+              const padX = 6, padY = 3;
+              const w = metrics.width + padX * 2;
+              const h = 18;
+              const rx = midX - w/2;
+              const ry = midY - h/2;
+              cctx.beginPath();
+              if(cctx.roundRect){
+                cctx.roundRect(rx, ry, w, h, 6);
+              }else{
+                const r = 6;
+                cctx.moveTo(rx+r, ry);
+                cctx.lineTo(rx+w-r, ry);
+                cctx.quadraticCurveTo(rx+w, ry, rx+w, ry+r);
+                cctx.lineTo(rx+w, ry+h-r);
+                cctx.quadraticCurveTo(rx+w, ry+h, rx+w-r, ry+h);
+                cctx.lineTo(rx+r, ry+h);
+                cctx.quadraticCurveTo(rx, ry+h, rx, ry+h-r);
+                cctx.lineTo(rx, ry+r);
+                cctx.quadraticCurveTo(rx, ry, rx+r, ry);
+                cctx.closePath();
+              }
+              cctx.fillStyle = 'rgba(255,255,255,.97)';
+              cctx.fill();
+              cctx.lineWidth = 1.3;
+              cctx.strokeStyle = color;
+              cctx.stroke();
+              cctx.fillStyle = color;
+              cctx.fillText(label, midX, midY + 0.5);
             }
           });
           cctx.restore();
@@ -696,10 +731,10 @@
           scales: {
             x: {
               type: 'linear',
-              title: { display:true, text:xTitle, color:'#0f1a36', font:{ weight:'800', size:14 } },
+              title: { display:true, text:xTitle, color:'#0f1a36', font:{ weight:'800', size:18 } },
               ticks: {
                 color:'#1f2a44',
-                font:{ weight:'700' },
+                font:{ weight:'700', size:14 },
                 callback: v => xMode === 'time' ? formatDate(v) : v,
               },
               grid: { color:'rgba(60,90,170,.18)' },
@@ -708,8 +743,8 @@
             y: {
               min: 0,
               max: yMax,
-              title: { display:true, text:yTitle, color:'#0f1a36', font:{ weight:'800', size:14 } },
-              ticks: { color:'#1f2a44', font:{ weight:'700' } },
+              title: { display:true, text:yTitle, color:'#0f1a36', font:{ weight:'800', size:18 } },
+              ticks: { color:'#1f2a44', font:{ weight:'700', size:14 } },
               grid: { color:'rgba(60,90,170,.18)' },
               border: { color:'#3b4a6b', width:1.5 },
             }
@@ -725,7 +760,9 @@
 
     /* ============ 初始化 ============ */
     function syncPkitVisibility(){
-      els.pkitWrap.hidden = (els.type.value !== 'processkits');
+      // 未選任何 PART 類型（=全部）或選了 processkits 就顯示品名下拉
+      const types = readMulti(els.type);
+      els.pkitWrap.hidden = types.length > 0 && !types.includes('processkits');
     }
 
     function whenChartJsReady(){
@@ -754,13 +791,19 @@
       refreshSnOptions();
       refreshChart();
 
-      [els.type, els.group, els.tool, els.pkit, els.sn, els.yAxis, els.xAxis, els.showDelta].forEach(el => {
+      [els.type, els.group, els.tool, els.pkit, els.sn, els.yAxis, els.xAxis].forEach(el => {
         el.addEventListener('change', () => {
           if(el === els.type){ syncPkitVisibility(); refreshSnOptions(); }
           if(el === els.group){ fillToolSelect(); refreshSnOptions(); }
           if(el === els.tool || el === els.pkit){ refreshSnOptions(); }
           refreshChart();
         });
+      });
+
+      // Δ 值 checkbox 獨立處理：只做 chart.update()，不重跑資料收集與 refreshChart，避免篩選內容視覺復歸
+      els.showDelta?.addEventListener('change', () => {
+        showDelta = !!els.showDelta.checked;
+        if(chart) chart.update('none');
       });
 
       document.getElementById('reload')?.addEventListener('click', async () => {
