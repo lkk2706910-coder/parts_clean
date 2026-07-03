@@ -85,13 +85,20 @@
     .back-link{color:var(--accent-dark);text-decoration:none;font-size:13px;font-weight:800;padding:7px 12px;border:1px solid var(--border-soft);border-radius:999px;background:#fff;transition:all .15s ease}
     .back-link:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-dark);box-shadow:0 6px 14px rgba(94,124,240,.18)}
     .legend-hint{font-size:12px;color:var(--muted)}
+    .delta-toggle{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border:1px solid var(--border-soft);border-radius:999px;background:#fff;font-size:13px;font-weight:800;color:var(--accent-dark);cursor:pointer;user-select:none;transition:all .15s ease}
+    .delta-toggle:hover{background:var(--accent-soft);border-color:var(--accent);box-shadow:0 6px 14px rgba(94,124,240,.15)}
+    .delta-toggle input{width:auto;margin:0;accent-color:var(--accent);cursor:pointer}
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="topbar">
       <a class="back-link" href="./index.html">← 返回 Parts Clean</a>
-      <span style="display:flex;gap:10px;align-items:center">
+      <span style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <label class="delta-toggle" title="在每兩點之間顯示 Y 值差 Δ">
+          <input id="f-delta" type="checkbox" checked />
+          <span>顯示 Δ 值</span>
+        </label>
         <button id="load-from-excel" class="back-link" type="button" style="cursor:pointer">從 Excel 載入</button>
         <input type="file" id="excel-input" accept=".xlsx,.xls" hidden />
         <button id="reload" class="back-link" type="button" style="cursor:pointer">重新載入後端</button>
@@ -383,6 +390,7 @@
       sn:   document.getElementById('f-sn'),
       yAxis:document.getElementById('f-y'),
       xAxis:document.getElementById('f-x'),
+      showDelta: document.getElementById('f-delta'),
       info: document.getElementById('info'),
       canvas: document.getElementById('chart'),
     };
@@ -617,9 +625,48 @@
         return;
       }
 
+      // Δ 值繪製 plugin：在相鄰兩點連線的中點畫出 y 值差
+      const showDelta = !!els.showDelta?.checked;
+      const deltaLabelsPlugin = {
+        id: 'deltaLabels',
+        afterDatasetsDraw(c){
+          if(!showDelta) return;
+          const cctx = c.ctx;
+          cctx.save();
+          cctx.font = 'bold 10.5px system-ui, sans-serif';
+          cctx.textAlign = 'center';
+          cctx.textBaseline = 'bottom';
+          c.data.datasets.forEach((ds, di) => {
+            const meta = c.getDatasetMeta(di);
+            if(!meta || meta.hidden) return;
+            const pts = meta.data;
+            for(let i=1; i<pts.length; i++){
+              const p0 = pts[i-1], p1 = pts[i];
+              if(!p0 || !p1) continue;
+              const y0 = ds.data[i-1]?.y, y1 = ds.data[i]?.y;
+              if(!Number.isFinite(y0) || !Number.isFinite(y1)) continue;
+              const delta = y1 - y0;
+              const midX = (p0.x + p1.x) / 2;
+              const midY = (p0.y + p1.y) / 2 - 6;
+              const label = (delta >= 0 ? '+' : '') + delta.toFixed(2);
+              // 白色描邊讓字在任何顏色線上都清楚
+              cctx.lineWidth = 3.5;
+              cctx.strokeStyle = 'rgba(255,255,255,.95)';
+              cctx.strokeText(label, midX, midY);
+              cctx.fillStyle = delta > 0 ? '#c62828'
+                             : delta < 0 ? '#2e7d32'
+                             : '#374151';
+              cctx.fillText(label, midX, midY);
+            }
+          });
+          cctx.restore();
+        }
+      };
+
       chart = new Chart(els.canvas.getContext('2d'), {
         type: 'line',
         data: { datasets },
+        plugins: [deltaLabelsPlugin],
         options: {
           responsive: true,
           maintainAspectRatio: false,
@@ -633,7 +680,16 @@
                   const x = items[0].parsed.x;
                   return xMode === 'time' ? formatDate(x) : `${xTitle}: ${x}`;
                 },
-                label: it => `${it.dataset.label}: ${it.parsed.y?.toFixed?.(3) ?? it.parsed.y}`,
+                label: it => {
+                  const base = `${it.dataset.label}: ${it.parsed.y?.toFixed?.(3) ?? it.parsed.y}`;
+                  const i = it.dataIndex;
+                  const prev = it.dataset.data[i-1];
+                  if(prev && Number.isFinite(prev.y)){
+                    const d = it.parsed.y - prev.y;
+                    return base + `  (Δ ${d >= 0 ? '+' : ''}${d.toFixed(3)})`;
+                  }
+                  return base;
+                },
               }
             }
           },
@@ -698,7 +754,7 @@
       refreshSnOptions();
       refreshChart();
 
-      [els.type, els.group, els.tool, els.pkit, els.sn, els.yAxis, els.xAxis].forEach(el => {
+      [els.type, els.group, els.tool, els.pkit, els.sn, els.yAxis, els.xAxis, els.showDelta].forEach(el => {
         el.addEventListener('change', () => {
           if(el === els.type){ syncPkitVisibility(); refreshSnOptions(); }
           if(el === els.group){ fillToolSelect(); refreshSnOptions(); }
